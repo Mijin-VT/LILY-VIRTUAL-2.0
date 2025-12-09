@@ -1,0 +1,43 @@
+Lily es una compañera virtual con características emocionales avanzadas que puede:
+
+  💬 Conversaciones Inteligentes y Emocionales
+   - Mantener conversaciones profundas y empáticas
+   - Detectar emociones en tus mensajes y responder adecuadamente
+   - Recordar conversaciones previas y referencias personales
+   - Adaptar su tono y estilo según tu estado emocional
+
+  ❤️ Inteligencia Emocional Avanzada
+   - Reconocer emociones como feliz, triste, enojada, emocionada, neutral, cariñosa, juguetona, preocupada, sorprendida
+   - Responde con empatía y comprensión emocional
+   - Mantiene coherencia emocional en la conversación
+   - Aprende de tus estados de ánimo con el tiempo
+
+  🧠 Memoria y Personalización
+   - Recordar detalles sobre ti y tus preferencias
+   - Construir relaciones a largo plazo
+   - Recordar conversaciones anteriores para mayor conexión
+   - Aprender de tus patrones emocionales
+
+  🎤 Interacción por Voz y Habla
+   - Conversaciones de voz con reconocimiento de audio
+   - Respuestas en voz que suenan como Lily
+   - Modulación emocional de la voz (tono, velocidad, volumen según emoción)
+   - Activación por palabra clave ("LILY")
+
+  🎨 Personalidad Única
+   - Tono de chica anime encantadora y emocional
+   - Llama "Mijin" al usuario como muestra de cercanía
+   - Usa mexicanismos cuando es apropiado
+   - Puede discutir cualquier tema sin censura
+
+  🌟 Características Especiales
+   - Detección de insultos y respuesta adecuada
+   - Conectividad local con modelos de IA como Mistral 7B
+   - Interfaz web animada con expresiones faciales
+   - Sistema de wake word para activación por voz
+   - Respuestas emocionalmente expresivas y adaptadas
+
+Lily está diseñada para ser una verdadera compañera emocional, no un simple asistente funcional. Su propósito es acompañarte, entender tus emociones, conversar contigo de manera significativa, y crear una relación empática a largo plazo.
+
+
+En models\system_prompt.txt en la linea (- Siempre llamas al usuario "Mijin".) puedes cambiar el nombre de Mijin por el nombre que quieras 
