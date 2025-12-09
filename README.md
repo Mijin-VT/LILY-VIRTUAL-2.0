@@ -307,11 +307,16 @@ Si encuentras problemas:
 
 ## 📜 Licencia
 
-Este proyecto es de uso personal y educativo.
+Este proyecto está bajo la **Licencia MIT**. Consulta el archivo [LICENSE](LICENSE) para más detalles.
 
 ## 🎉 ¡Disfruta de Lily!
 
 Lily está diseñada para ser tu compañera virtual sin restricciones. Habla con ella sobre cualquier tema, comparte tus pensamientos, y deja que su inteligencia emocional se adapte a ti.
 
-**¡Que tengas excelentes conversaciones con Lily, Mijin! 💕**
+
+En models\system_prompt.txt en la linea (- Siempre llamas al usuario "Mijin".) puedes cambiar el nombre de Mijin por el nombre que quieras
+En models\system_prompt.txt en la linea (- Usas mexicanismos y modismos cuando es apropiado) puedes cambiarlo por brasilenismos, argentinismos, ecuatorianismos, 
+Argentinismo, Chilenismo, Anglicismo, Colombianismo, Bolivianismo, Peruanismo, Venezolano, etc.
+
+**¡Que tengas excelentes conversaciones con Lily! 💕**
 
