@@ -1,0 +1,65 @@
+LILY - Compañera Virtual de IA
+================================
+
+Lily es tu compañera virtual de inteligencia artificial diseñada para Windows 10/11, con personalidad única, capacidades emocionales avanzadas, memoria semántica a largo plazo y herramientas de productividad local.
+
+CARACTERÍSTICAS PRINCIPALES:
+============================
+
+1. INTELIGENCIA EMOCIONAL AVANZADA
+   - Sistema de seguimiento emocional en tiempo real (mood tracking) del texto.
+   - 9 estados emocionales: feliz, triste, enojada, emocionada, neutral, cariñosa, juguetona, preocupada y sorprendida.
+   - Adaptación de la respuesta y del tono de voz (ritmo, velocidad, volumen) según su estado de ánimo.
+   - Memoria emocional persistente en base de datos.
+
+2. INTERACCIÓN POR VOZ FLEXIBLE
+   - Modo de Conversación Continua: Activación de manos libres con detección de silencio local mediante la API Web Audio de tu navegador. Lily te escuchará, responderá con voz, y automáticamente volverá a escucharte al terminar de hablar.
+   - Wake Word "LILY" básico en el navegador para activarla con tu voz.
+   - Transcripción online con Whisper y síntesis de voz modulada (gTTS + pydub) para máxima expresividad.
+
+3. PLANIFICADOR DE TAREAS Y RECORDATORIOS
+   - Agenda recordatorios de voz y comando. Al llegar la hora, Lily hablará en voz alta en tus bocinas usando el sintetizador SAPI nativo de Windows (ej. "Atención Mijin. Recordatorio importante: [desc]").
+   - Programa ejecuciones de comandos de consola del sistema en segundo plano.
+   - Comandos de voz/chat:
+     - "recuérdame tomar agua cada 2 horas" (recurrentes)
+     - "recuérdame a las 5 pm apagar la cocina" (una sola vez)
+     - "ejecuta el comando [cmd] a las 6 pm"
+     - "lista mis tareas" / "qué tareas tengo"
+     - "cancela la tarea [id]"
+
+4. INTEGRACIÓN CON GMAIL
+   - Envía correos electrónicos redactados con lenguaje natural a través de SMTP.
+   - Revisa tu bandeja de entrada de Gmail y lee en voz alta un resumen de tus correos no leídos vía IMAP.
+   - Comandos de voz/chat:
+     - "envía un correo a juan@gmail.com con asunto Saludo y cuerpo hola como estas"
+     - "revisa mis correos" / "tengo correos nuevos"
+   - Configuración segura a través del formulario visual en el panel de Ajustes.
+
+5. BÚSQUEDA WEB SEMÁNTICA RAG (Searxng)
+   - Realiza búsquedas de información en tiempo real a través de Searxng (con fallbacks a instancias públicas seguras).
+   - Inyecta el contenido recuperado de internet directamente en el prompt del LLM para responder preguntas del presente.
+   - Comandos de voz/chat:
+     - "busca en internet sobre [tema]" / "busca en la web sobre [tema]"
+
+6. MEMORIA HÍBRIDA (SQLite + ChromaDB)
+   - SQLite (lily_memory.db): Mantiene el historial de chat, preferencias y estados emocionales de forma relacional y veloz.
+   - ChromaDB (colección lily_memories): Indexa semánticamente las oraciones del usuario para recuperarlas y recordar detalles sobre ti a largo plazo.
+
+7. BASE DE CONOCIMIENTO (RAG local)
+   - Sube documentos de texto, artículos, manuales o PDFs desde la interfaz web.
+   - Lily buscará semánticamente dentro de ellos usando embeddings en tiempo real y te responderá en base a esa información (buscador local de archivos).
+
+8. CONFIGURACIÓN DENTRO DEL PANEL DE AJUSTES
+   - Configura tu usuario y contraseña de aplicación de Gmail de forma segura.
+   - Cambia el nombre con el que quieres que Lily se dirija a ti (cambia el saludo "¡Hola [Nombre]! 💞" de la interfaz, el placeholder de escritura, y la forma en que se expresa el LLM).
+   - Botón de cambio de tema Claro / Oscuro en el cabecero para proteger tu vista.
+
+REQUISITOS DEL SISTEMA:
+=======================
+- Windows 10 o Windows 11
+- Python 3.11, 3.12 o 3.13
+- Ollama instalado localmente con el modelo Mistral 7B
+- Micrófono y altavoces configurados en el sistema
+- Dependencias especificadas en requirements.txt
+
+¡Lily está lista para acompañarte y asistirte! 💕

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌸 Lily virtual companion AI 🌸</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=3.1">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header" style="position: relative;">
+            <button id="themeToggle" class="theme-toggle-btn" title="Cambiar Tema">🌙</button>
+            <div class="avatar-container">
+                <div class="avatar" id="avatar">
+                    <div class="avatar-face">
+                        <div class="eyes">
+                            <div class="eye left-eye">
+                                <div class="pupil"></div>
+                            </div>
+                            <div class="eye right-eye">
+                                <div class="pupil"></div>
+                            </div>
+                        </div>
+                        <div class="mouth" id="mouth"></div>
+                    </div>
+                </div>
+                <div class="emotion-indicator" id="emotionIndicator">
+                    <span id="emotionText">neutral</span>
+                </div>
+            </div>
+            <div class="header-info">
+                <h1>🌸 Lily 🌸</h1>
+                <p class="subtitle">Tu compañera virtual con inteligencia emocional</p>
+                <div class="status-indicator">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Conectando...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <h2 id="welcomeUserHeader">¡Hola Mijin! 💞</h2>
+                <p>Soy Lily, tu compañera virtual. Puedo hablar de cualquier tema sin restricciones. ¿Como estas el dia de hoy?</p>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div class="input-container">
+                <textarea 
+                    id="messageInput" 
+                    placeholder="Escribe tu mensaje aquí..." 
+                    rows="1"
+                    maxlength="2000"
+                ></textarea>
+                <button id="micButton" class="mic-button" title="Hablar">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                </button>
+                <button id="sendButton" class="send-button">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="input-controls">
+                <button id="clearButton" class="control-button">🗑️ Limpiar</button>
+                <button id="memoryButton" class="control-button">💭 Memoria</button>
+                <button id="commandsButton" class="control-button">📋 Comandos</button>
+                <button id="settingsButton" class="control-button">⚙️ Settings</button>
+                <span class="char-counter"><span id="charCount">0</span>/2000</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Memoria -->
+    <div id="memoryModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>💭 Memoria de Conversación</h2>
+            <div id="memoryContent">
+                <p>Cargando memoria...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Settings (RAG) -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content settings-modal-content">
+            <span class="close close-settings">&times;</span>
+            <h2>⚙️ Configuración y Conocimiento (RAG)</h2>
+            
+            <div class="settings-section">
+                <h3>📁 Subir Documento a Base de Conocimiento</h3>
+                <p class="section-desc">Sube archivos TXT, MD, PDF o DOCX. Lily buscará dentro de ellos en tiempo real para responderte.</p>
+                <div class="upload-container">
+                    <input type="file" id="ragFileInput" accept=".txt,.md,.pdf,.docx" style="display: none;">
+                    <button id="selectFileBtn" class="action-button secondary">Seleccionar Archivo</button>
+                    <span id="selectedFileName" style="margin-left: 10px; font-size: 0.9em; color: #555;">Ningún archivo seleccionado</span>
+                    <button id="uploadFileBtn" class="action-button primary" style="margin-left: 10px;" disabled>Subir 📤</button>
+                </div>
+                <div id="uploadStatus" class="status-msg"></div>
+            </div>
+
+            <div class="settings-section">
+                <h3>👤 Personalización de Nombre</h3>
+                <p class="section-desc">Escribe el nombre con el que quieres que Lily se dirija a ti (ej: Mijin, Amor, Juan, etc.).</p>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="text" id="userNameInput" placeholder="Mijin" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 13px; max-width: 250px;">
+                    <button id="saveUserNameBtn" class="action-button primary" style="padding: 8px 15px; font-size: 13px;">Guardar Nombre</button>
+                </div>
+                <div id="userNameStatus" class="status-msg"></div>
+            </div>
+            
+            <div class="settings-section">
+
+                <h3>✉️ Integración con Gmail</h3>
+                <p class="section-desc">Configura tu correo de Gmail y contraseña de aplicación para que Lily pueda revisar y enviar correos por ti.</p>
+                <div class="gmail-form" style="display: flex; flex-direction: column; gap: 10px; max-width: 400px;">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="gmailUserInput" style="font-size: 12px; font-weight: bold; color: #555;">Gmail de Usuario:</label>
+                        <input type="email" id="gmailUserInput" placeholder="tu_correo@gmail.com" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 13px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="gmailPasswordInput" style="font-size: 12px; font-weight: bold; color: #555;">Contraseña de Aplicación:</label>
+                        <input type="password" id="gmailPasswordInput" placeholder="Contraseña de aplicación de 16 caracteres" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <button id="saveGmailBtn" class="action-button primary" style="padding: 8px 15px; font-size: 13px;">Guardar Credenciales</button>
+                    </div>
+                </div>
+                <div id="gmailConfigStatus" class="status-msg"></div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>📚 Documentos Indexados</h3>
+                <div id="ragDocumentsList" class="doc-list">
+                    <p>Cargando documentos...</p>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button id="reindexBtn" class="action-button secondary">🔄 Sincronizar Carpeta 'knowledge/'</button>
+                </div>
+            </div>
+            
+            <div class="settings-section">
+                <h3>📊 Estadísticas de la Base de Datos</h3>
+                <div id="ragStats" class="rag-stats-grid">
+                    <p>Cargando estadísticas...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Comandos -->
+    <div id="commandsModal" class="modal">
+        <div class="modal-content settings-modal-content">
+            <span class="close close-commands">&times;</span>
+            <h2>📋 Lista de Comandos Disponibles</h2>
+            <p class="section-desc" style="margin-top: 10px;">Puedes interactuar con Lily usando estos comandos por chat o comandos rápidos por voz:</p>
+            
+            <div class="commands-table-container">
+                <table class="commands-table">
+                    <thead>
+                        <tr>
+                            <th>Categoría</th>
+                            <th>Comandos / Frases Clave</th>
+                            <th>Ejemplo</th>
+                            <th>Acción realizada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="category">🎵 YouTube / Música</td>
+                            <td><code>reproduce</code>, <code>pon música</code>, <code>pon</code>, <code>escuchar</code></td>
+                            <td>"reproduce lofi girl", "pon música de Adele"</td>
+                            <td>Busca el término y abre los resultados en YouTube en el navegador.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">🎵 Control Multimedia</td>
+                            <td><code>pausa</code>, <code>detén</code>, <code>para</code>, <code>siguiente</code>, <code>anterior</code>, <code>atrás</code></td>
+                            <td>"pausa", "siguiente video", "anterior"</td>
+                            <td>Controla la reproducción, salta o regresa de canción simulando teclas multimedia.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">🔊 Volumen</td>
+                            <td><code>sube volumen</code>, <code>baja volumen</code>, <code>silencio</code>, <code>mute</code></td>
+                            <td>"sube el volumen", "silencio"</td>
+                            <td>Controla los niveles de volumen del sistema de sonido.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">🔍 Búsqueda Web</td>
+                            <td><code>busca en google</code>, <code>busca</code>, <code>googlea</code>, <code>investiga</code></td>
+                            <td>"busca la receta de lasaña en google", "googlea clima de hoy"</td>
+                            <td>Abre una nueva pestaña en Google con la consulta realizada.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">🌐 Búsqueda Web RAG</td>
+                            <td><code>busca en internet sobre X</code>, <code>busca en la web sobre X</code></td>
+                            <td>"busca en internet sobre el precio del bitcoin"</td>
+                            <td>Realiza una consulta en tiempo real, lee el contenido de la web y responde directamente con IA.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">✉️ Correo (Gmail)</td>
+                            <td><code>revisa mis correos</code>, <code>tengo correos nuevos</code>, <code>envía un correo a [email]</code></td>
+                            <td>"envía un correo a juan@gmail.com asunto reunión mensaje llego tarde"</td>
+                            <td>Lee tu bandeja de entrada o envía correos electrónicos de forma automática.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">⏰ Recordatorios</td>
+                            <td><code>recuérdame [tarea] en [tiempo]</code>, <code>avísame de [tarea] a las [hora]</code></td>
+                            <td>"recuérdame tomar agua en 30 minutos", "avísame de la junta a las 3 pm"</td>
+                            <td>Programa alertas de voz que hablarán por tus bocinas al cumplirse el tiempo.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">🖥️ Ejecución</td>
+                            <td><code>ejecuta el comando [CMD] en [tiempo]</code></td>
+                            <td>"ejecuta el comando notepad en 5 segundos"</td>
+                            <td>Ejecuta comandos del sistema operativo de forma programada y asíncrona.</td>
+                        </tr>
+                        <tr>
+                            <td class="category">📋 Consultar Agenda</td>
+                            <td><code>qué tareas tengo</code>, <code>lista mis tareas</code>, <code>cancela la tarea [ID]</code></td>
+                            <td>"qué tareas tengo", "cancela la tarea 2"</td>
+                            <td>Lista o cancela las tareas y recordatorios programados activos.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=3.1"></script>
+</body>
+</html>

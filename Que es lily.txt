@@ -1,0 +1,36 @@
+Lily es una compañera virtual con inteligencia emocional avanzada, memoria semántica a largo plazo y automatizaciones de productividad:
+
+  💬 Conversaciones Inteligentes y Emocionales
+   - Mantiene conversaciones profundas y empáticas de cualquier tema.
+   - Detecta emociones en tus mensajes (9 estados emocionales) y responde adecuadamente.
+   - Recuerda conversaciones previas, referencias personales e indexa tu historial de chat.
+   - Adapta su tono y estilo según tu estado emocional.
+
+  ❤️ Inteligencia Emocional Avanzada
+   - Reconoce emociones: feliz, triste, enojada, emocionada, neutral, cariñosa, juguetona, preocupada, sorprendida.
+   - Responde con empatía y mantiene coherencia emocional.
+   - Modula su tono de voz, velocidad y volumen en base a su estado emocional.
+
+  🧠 Memoria Semántica a Largo Plazo
+   - Utiliza una base de datos híbrida: SQLite para el historial de chat estructurado y ChromaDB para indexar tus mensajes semánticamente.
+   - Recuerda tus detalles y preferencias cotidianas automáticamente.
+   - Recupera recuerdos pasados del usuario en tiempo real para generar mayor conexión.
+
+  🎤 Interacción por Voz Avanzada
+   - Modos de voz: Wake word básico ("LILY") y Modo de Voz Continuo (manos libres).
+   - Conversación manos libres gracias a la detección de silencio mediante Web Audio API en tu navegador.
+   - Transcripción online con Whisper y síntesis de voz modulada (gTTS + pydub).
+
+  ⚙️ Interfaz y Personalización de Configuración
+   - Panel de Configuración UI para subir y gestionar documentos de texto, artículos o PDFs (RAG local).
+   - Cambia tu nombre directamente en el panel de configuración (cambia el saludo ¡Hola [Nombre]! de la interfaz y la forma en que Lily se dirige a ti).
+   - Registra tu cuenta y contraseña de aplicación de Gmail de manera sencilla en el formulario.
+   - Botón de cambio de tema Claro / Oscuro en el cabecero para proteger tu visión.
+
+  🖥️ Planificador y Utilidades de Productividad
+   - Programador de Tareas: Agenda recordatorios que Lily dirá en voz alta por tus bocinas (usando síntesis por voz nativa) y ejecuciones de comandos en segundo plano.
+   - Integración con Gmail: Revisa tu bandeja de entrada de correos sin leer o envía correos redactados mediante comandos de chat.
+   - Búsqueda Web Semántica RAG: Busca en internet a través de Searxng e inyecta la información en tiempo real de internet en las respuestas.
+   - Conciencia de fecha y hora del sistema en tiempo real.
+
+Puedes configurar a Lily cómodamente desde el panel de Ajustes en la interfaz del chat web.
