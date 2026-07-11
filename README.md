@@ -375,7 +375,7 @@ Editar `models/tts_engine.py`, diccionario `voice_params`
 - Carga automática al iniciar
 
 ### Texto a Voz
-- Motor base: gTTS (Google Text-to-Speech)
+- Motor base: Kokoro TTS (Local)
 - Procesamiento: pydub para modulación emocional
 - Formato: MP3, 128kbps
 - Limpieza automática de archivos antiguos
