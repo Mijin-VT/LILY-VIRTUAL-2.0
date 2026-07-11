@@ -412,7 +412,7 @@ Eres Lily en modo profesional. Mantén un tono formal, respetuoso y centrado en 
             self.user_preferences[user_id] = {}
         self.user_preferences[user_id].update(preferences)
     
-    def generate_response_with_context(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "mistral:7b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin"):
+    def generate_response_with_context(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "huihui_ai/qwen3-abliterated:0.6b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin"):
         """Genera una respuesta usando el contexto mejorado"""
         # Construir prompt con contexto
         messages = self.build_enhanced_prompt(user_message, user_id, emotional_context, rag_context, history, memory_context, user_name)

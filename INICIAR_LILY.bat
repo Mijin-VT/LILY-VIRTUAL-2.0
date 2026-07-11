@@ -94,31 +94,31 @@ if errorlevel 1 (
 )
 echo.
 
-REM [4/4] Verificar Ollama y el Modelo Mistral
+REM [4/4] Verificar Ollama y el Modelo huihui_ai/qwen3-abliterated:0.6b
 echo [4/4] Verificando Ollama...
 curl -s http://127.0.0.1:11434/api/tags >nul 2>&1
 if errorlevel 1 (
     echo [ADVERTENCIA] Ollama no esta ejecutandose
     echo La aplicacion funcionara pero sin IA conversacional.
     echo 1. Instala Ollama desde https://ollama.ai/
-    echo 2. Ejecuta: ollama pull mistral
+    echo 2. Ejecuta: ollama pull huihui_ai/qwen3-abliterated:0.6b
     echo.
 ) else (
     echo [OK] Ollama detectado y en linea
-    echo Verificando si el modelo 'mistral' esta instalado...
-    ollama show mistral >nul 2>&1
+    echo Verificando si el modelo 'huihui_ai/qwen3-abliterated:0.6b' esta instalado...
+    ollama show huihui_ai/qwen3-abliterated:0.6b >nul 2>&1
     if errorlevel 1 (
-        echo [ADVERTENCIA] El modelo 'mistral' no se encuentra en Ollama.
-        echo Descargando 'mistral' - esto puede tardar varios minutos...
-        ollama pull mistral
+        echo [ADVERTENCIA] El modelo 'huihui_ai/qwen3-abliterated:0.6b' no se encuentra en Ollama.
+        echo Descargando 'huihui_ai/qwen3-abliterated:0.6b' - esto puede tardar varios minutos...
+        ollama pull huihui_ai/qwen3-abliterated:0.6b
         if errorlevel 1 (
-            echo [ERROR] No se pudo descargar el modelo 'mistral' automaticamente.
-            echo Por favor, ejecuta en otra consola: ollama pull mistral
+            echo [ERROR] No se pudo descargar el modelo 'huihui_ai/qwen3-abliterated:0.6b' automaticamente.
+            echo Por favor, ejecuta en otra consola: ollama pull huihui_ai/qwen3-abliterated:0.6b
         ) else (
-            echo [OK] Modelo 'mistral' descargado e instalado con exito
+            echo [OK] Modelo 'huihui_ai/qwen3-abliterated:0.6b' descargado e instalado con exito
         )
     ) else (
-        echo [OK] Modelo 'mistral' ya esta instalado en Ollama
+        echo [OK] Modelo 'huihui_ai/qwen3-abliterated:0.6b' ya esta instalado en Ollama
     )
 )
 echo.

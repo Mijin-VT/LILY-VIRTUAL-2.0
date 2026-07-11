@@ -132,9 +132,9 @@ if not "!OLLAMA_CMD!"=="" (
 echo.
 
 REM ------------------------------------------------------------
-REM 3. CONFIGURAR OLLAMA Y MODELO MISTRAL
+REM 3. CONFIGURAR OLLAMA Y MODELO huihui_ai/qwen3-abliterated:0.6b
 REM ------------------------------------------------------------
-echo [3/4] Verificando servicio de Ollama y modelo Mistral...
+echo [3/4] Verificando servicio de Ollama y modelo huihui_ai/qwen3-abliterated:0.6b...
 
 REM Comprobar si Ollama esta corriendo en el puerto 11434
 curl -s http://127.0.0.1:11434/api/tags >nul 2>&1
@@ -156,30 +156,30 @@ if !errorlevel! neq 0 (
     echo Asegurate de que Ollama este corriendo antes de usar a Lily.
 ) else (
     echo [OK] Servicio de Ollama en linea.
-    echo Verificando si el modelo 'mistral' esta instalado...
+    echo Verificando si el modelo 'huihui_ai/qwen3-abliterated:0.6b' esta instalado...
     
     REM Ejecutar comando show o api
     if exist "%LocalAppData%\Programs\Ollama\ollama.exe" (
-        "%LocalAppData%\Programs\Ollama\ollama.exe" show mistral >nul 2>&1
+        "%LocalAppData%\Programs\Ollama\ollama.exe" show huihui_ai/qwen3-abliterated:0.6b >nul 2>&1
     ) else (
-        ollama show mistral >nul 2>&1
+        ollama show huihui_ai/qwen3-abliterated:0.6b >nul 2>&1
     )
     
     if !errorlevel! neq 0 (
-        echo Descargando modelo 'mistral' - esto puede tardar varios minutos...
+        echo Descargando modelo 'huihui_ai/qwen3-abliterated:0.6b' - esto puede tardar varios minutos...
         if exist "%LocalAppData%\Programs\Ollama\ollama.exe" (
-            "%LocalAppData%\Programs\Ollama\ollama.exe" pull mistral
+            "%LocalAppData%\Programs\Ollama\ollama.exe" pull huihui_ai/qwen3-abliterated:0.6b
         ) else (
-            ollama pull mistral
+            ollama pull huihui_ai/qwen3-abliterated:0.6b
         )
         if !errorlevel! equ 0 (
-            echo [OK] Modelo 'mistral' descargado correctamente.
+            echo [OK] Modelo 'huihui_ai/qwen3-abliterated:0.6b' descargado correctamente.
         ) else (
             echo [ERROR] No se pudo descargar el modelo automaticamente.
-            echo Corre 'ollama pull mistral' manualmente mas tarde.
+            echo Corre 'ollama pull huihui_ai/qwen3-abliterated:0.6b' manualmente mas tarde.
         )
     ) else (
-        echo [OK] Modelo 'mistral' ya se encuentra instalado.
+        echo [OK] Modelo 'huihui_ai/qwen3-abliterated:0.6b' ya se encuentra instalado.
     )
 )
 echo.

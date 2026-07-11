@@ -55,3 +55,12 @@ desktop.ini
 tmp/
 temp/
 *.tmp
+
+# Modelos pesados de IA locales
+models/*.onnx
+models/*.bin
+
+# Base de datos local SQLite y ChromaDB
+data/*.db
+data/chroma_db/
+

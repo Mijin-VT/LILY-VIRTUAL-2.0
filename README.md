@@ -84,6 +84,23 @@ Puedes configurar a Lily cómodamente desde el panel de Ajustes en la interfaz d
 
 ## 🔧 Requisitos del Sistema
 
+### Requisitos de Hardware (Características Básicas y Recomendadas)
+
+Para ejecutar Lily AI localmente, tu computadora debe cumplir con uno de los siguientes perfiles de hardware:
+
+| Componente | Características Básicas (Mínimas) | Características Recomendadas (Medias/Óptimas) |
+| :--- | :--- | :--- |
+| **Procesador (CPU)** | Intel Core i3 / AMD Ryzen 3 (Quad-core, 2.0 GHz o superior) | Intel Core i5 / AMD Ryzen 5 o superior (Octa-core) |
+| **Memoria RAM** | 8 GB RAM (límite mínimo para Ollama) | 16 GB RAM o más (ideal para multitarea fluida) |
+| **Almacenamiento** | 8 GB de espacio libre (HDD) | 20 GB de espacio libre en **SSD** (para inicio rápido de modelos) |
+| **Tarjeta Gráfica (GPU)** | No requerida (ejecución mediante CPU) | **NVIDIA dedicada (6 GB+ VRAM)** (para acelerar Ollama y Whisper) |
+| **Entrada de Voz** | Micrófono básico o integrado | Micrófono con cancelación de ruido / Auriculares |
+| **Salida de Voz** | Altavoces estándar | Altavoces o auriculares de calidad decente |
+| **Conexión de Red** | 1 Mbps (para síntesis de voz mediante gTTS) | 10 Mbps o superior (descarga de modelos y estabilidad) |
+
+> [!IMPORTANT]
+> Si no cuentas con una tarjeta gráfica dedicada NVIDIA, el modelo de lenguaje (Qwen3 0.6B) y el transcriptor de voz (Whisper) se ejecutarán en la CPU. Esto aumentará significativamente el tiempo de respuesta de Lily. Se recomienda disponer de **16 GB de RAM** si ejecutas el sistema completamente en CPU.
+
 ### Software Requerido
 1. **Windows 10** o superior
 2. **Python 3.11** o superior
@@ -92,7 +109,7 @@ Puedes configurar a Lily cómodamente desde el panel de Ajustes en la interfaz d
 
 3. **Ollama** para ejecutar modelos de IA localmente
    - Descargar desde: https://ollama.ai/
-   - Después de instalar, ejecutar: `ollama pull mistral`
+   - Después de instalar, ejecutar: `ollama pull huihui_ai/qwen3-abliterated:0.6b`
 
 4. **Microsoft Edge** (ya incluido en Windows 10)
 
@@ -118,7 +135,7 @@ El proyecto incluye un instalador automático inteligente que configurará todo 
 1. Haz doble clic en el archivo **`INSTALAR.bat`**.
 2. El script detectará si tienes instalados los componentes necesarios:
    - Si no tienes **Python 3.11** u **Ollama**, los descargará e instalará automáticamente (usando *winget*).
-   - Levantará el servicio de Ollama y descargará el modelo de lenguaje **`mistral`** de forma automática.
+   - Levantará el servicio de Ollama y descargará el modelo de lenguaje **`huihui_ai/qwen3-abliterated:0.6b`** de forma automática.
    - Creará el entorno virtual (`venv`) e instalará todas las dependencias necesarias de `requirements.txt`.
 3. Una vez finalizado el instalador, ¡ya estás listo para ejecutar el asistente!
 
@@ -140,7 +157,7 @@ Si prefieres instalar cada componente de forma individual:
 2. Inicia la aplicación de Ollama.
 3. Descarga el modelo conversacional ejecutando en la consola:
    ```cmd
-   ollama pull mistral
+   ollama pull huihui_ai/qwen3-abliterated:0.6b
    ```
 
 #### Paso 3: Configurar Entorno y Dependencias
@@ -190,7 +207,7 @@ lily_assistant/
 2. El script verificará automáticamente:
    - Python instalado
    - Ollama ejecutándose
-   - Modelo Mistral 7B disponible
+   - Modelo huihui_ai/qwen3-abliterated:0.6b disponible
    - Dependencias instaladas
 3. Microsoft Edge se abrirá automáticamente
 4. ¡Listo! Ya puedes chatear con Lily
@@ -346,7 +363,7 @@ Editar `models/tts_engine.py`, diccionario `voice_params`
 ## 📝 Notas Técnicas
 
 ### Modelo de IA
-- **Modelo**: Mistral 7B (ejecutado localmente con Ollama)
+- **Modelo**: huihui_ai/qwen3-abliterated:0.6b (ejecutado localmente con Ollama)
 - **Temperatura**: 0.8 (balance entre creatividad y coherencia)
 - **Top-p**: 0.9
 - **Top-k**: 40

@@ -69,6 +69,6 @@
 
 ---
 
-## 8. Sistema de Voz (Faster Whisper + gTTS + pydub)
+## 8. Sistema de Voz (Faster Whisper + Kokoro TTS + pydub)
 - **Conversación Manos Libres**: Analizador de volumen que detecta silencios (1.8s) y detiene y envía la grabación automáticamente sin presionar botones.
-- **TTS Modulado**: Utiliza gTTS para generar voz fluida y `pydub` para cambiar el tono (pitch), velocidad (speed) y volumen (volume) según el estado emocional de Lily.
+- **TTS Modulado**: Utiliza Kokoro TTS (local) para generar voz fluida y `pydub` para cambiar el volumen (volume) y modulación de velocidad (speed) según el estado emocional de Lily.

@@ -177,7 +177,7 @@ pip install -r requirements.txt
 
 Si esto falla, prueba con:
 ```cmd
-pip install fastapi uvicorn pydantic vosk pyaudio pyautogui qwen-tts torch soundfile
+pip install fastapi uvicorn pydantic pyaudio pyautogui kokoro-onnx soundfile
 ```
 
 ---

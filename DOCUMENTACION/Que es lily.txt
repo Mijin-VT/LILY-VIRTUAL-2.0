@@ -15,7 +15,7 @@ CARACTERÍSTICAS PRINCIPALES:
 2. INTERACCIÓN POR VOZ FLEXIBLE
    - Modo de Conversación Continua: Activación de manos libres con detección de silencio local mediante la API Web Audio de tu navegador. Lily te escuchará, responderá con voz, y automáticamente volverá a escucharte al terminar de hablar.
    - Wake Word "LILY" básico en el navegador para activarla con tu voz.
-   - Transcripción online con Whisper y síntesis de voz modulada (gTTS + pydub) para máxima expresividad.
+   - Transcripción online con Whisper y síntesis de voz modulada (Kokoro TTS + pydub) para máxima expresividad.
 
 3. PLANIFICADOR DE TAREAS Y RECORDATORIOS
    - Agenda recordatorios de voz y comando. Al llegar la hora, Lily hablará en voz alta en tus bocinas usando el sintetizador SAPI nativo de Windows (ej. "Atención Mijin. Recordatorio importante: [desc]").
@@ -58,7 +58,7 @@ REQUISITOS DEL SISTEMA:
 =======================
 - Windows 10 o Windows 11
 - Python 3.11, 3.12 o 3.13
-- Ollama instalado localmente con el modelo Mistral 7B
+- Ollama instalado localmente con el modelo Qwen3 0.6B
 - Micrófono y altavoces configurados en el sistema
 - Dependencias especificadas en requirements.txt
 

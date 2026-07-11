@@ -9,7 +9,7 @@
 Este script de Windows automatiza completamente la instalación de Lily AI Virtual 3.0, instalando todo lo necesario:
 
 1. ✅ **Descarga e instalación de Python** si no está presente
-2. ✅ **Dependencias de Python** (FastAPI, Vosk, PyAudio, PyAutoGUI, Qwen3-TTS, etc.)
+2. ✅ **Dependencias de Python** (FastAPI, PyAudio, PyAutoGUI, Kokoro-ONNX, etc.)
 3. ✅ **Modelo Ollama Mistral 7B** (~4GB)
 4. ✅ **Modelo Vosk para reconocimiento de voz** (~50MB)
 5. ✅ **Configuración inicial** del entorno
@@ -61,7 +61,7 @@ El script ejecutará automáticamente estos pasos:
 [PASO 1/5] Verificando Python...
 [PASO 2/5] Instalando dependencias de Python...
 [PASO 3/5] Verificando Ollama...
-[PASO 4/5] Descargando modelo Mistral 7B... (~4GB)
+[PASO 4/5] Descargando modelo Qwen3 0.6B... (~380MB)
 [PASO 5/5] Verificando instalación...
 ```
 
@@ -84,7 +84,7 @@ Al finalizar, verás un resumen:
 ✅ Python instalado
 ✅ Dependencias de Python instaladas
 ✅ Ollama detectado
-✅ Modelo Mistral instalado
+✅ Modelo Qwen3 instalado
 ✅ Instalación completada exitosamente
 ```
 
@@ -95,7 +95,7 @@ Al finalizar, verás un resumen:
 | Componente | Tamaño | Tiempo (100 Mbps) | Tiempo (10 Mbps) |
 |------------|--------|-------------------|------------------|
 | Dependencias Python | ~200 MB | 1-2 minutos | 3-5 minutos |
-| Modelo Mistral 7B | ~4 GB | 5-7 minutos | 50-60 minutos |
+| Modelo Qwen3 0.6B | ~380 MB | 1-2 minutos | 50-60 minutos |
 | Configuración | - | 1-2 minutos | 1-2 minutos |
 | **TOTAL** | **~4.2 GB** | **7-10 minutos** | **55-70 minutos** |
 
@@ -126,7 +126,7 @@ Al finalizar, verás un resumen:
 
 ---
 
-### ❌ "No se pudo descargar el modelo Mistral"
+### ❌ "No se pudo descargar el modelo Qwen3"
 
 **Causa**: Problemas de conexión o Ollama no está ejecutándose.
 
@@ -134,7 +134,7 @@ Al finalizar, verás un resumen:
 1. Abrir CMD como administrador
 2. Ejecutar:
    ```cmd
-   ollama pull mistral
+   ollama pull huihui_ai/qwen3-abliterated:0.6b
    ```
 3. Esperar a que termine la descarga (~4GB)
 4. Verificar con: `ollama list`
@@ -277,7 +277,7 @@ Una vez completada la instalación:
 ## 📝 NOTAS IMPORTANTES
 
 ### Descargas Grandes
-- **Modelo Mistral**: ~4GB (puede tardar en conexiones lentas)
+- **Modelo Qwen3**: ~380MB (puede tardar en conexiones lentas)
 - **Dependencias**: ~200MB
 - Asegúrate de tener suficiente espacio en disco
 
@@ -303,7 +303,7 @@ Si necesitas reinstalar todo desde cero:
 ### 1. Eliminar modelos
 ```cmd
 # Eliminar modelo Mistral
-ollama rm mistral
+ollama rm huihui_ai/qwen3-abliterated:0.6b
 
 # Eliminar modelo Vosk (si existe)
 # Borrar carpeta: models\vosk-model-small-es-0.42\
@@ -328,11 +328,11 @@ pip uninstall -r requirements.txt -y
 | Vosk | 0.3.45 | Reconocimiento de voz offline |
 | PyAudio | 0.2.14 | Captura de audio del micrófono |
 | PyAutoGUI | 0.9.54 | Control de teclado (YouTube/medios) |
-| Qwen3-TTS | latest | Texto a voz neuronal |
+| Kokoro-ONNX | latest | Texto a voz neuronal |
 | ChromaDB | 0.4.22 | Base de datos vectorial |
 | TextBlob | 0.19.0 | Análisis de sentimientos |
 | Pydantic | 2.10.5 | Validación de datos |
-| Mistral 7B | Latest | Modelo de lenguaje vía Ollama |
+| Qwen3 0.6B | Latest | Modelo de lenguaje vía Ollama |
 
 ---
 
@@ -342,7 +342,7 @@ Después de ejecutar `Lily_Setup.bat` exitosamente, tu sistema estará completam
 
 - 🎤 **Reconocimiento de voz offline** (Vosk)
 - 🎵 **Control de YouTube y medios**
-- 💬 **Chat con IA** (Mistral 7B)
+- 💬 **Chat con IA** (Qwen3 0.6B)
 - ❤️ **Inteligencia emocional**
 - 🧠 **Memoria persistente**
 

@@ -49,12 +49,12 @@ Esta carpeta contiene toda la documentación técnica y de usuario del proyecto:
 
 ┌─────────────────┐      ┌──────────────────┐      ┌──────────────┐
 │  Interfaz Web   │◄────►│   FastAPI        │◄────►│ Ollama       │
-│  (Edge/Chrome)  │      │   Backend        │      │ (Mistral 7B) │
+│  (Edge/Chrome)  │      │   Backend        │      │ (Qwen3 0.6B) │
 └─────────────────┘      └──────────────────┘      └──────────────┘
         │                         │
         │                         ├──► Emotional Intelligence
         │                         ├──► Memory System
-        │                         ├──► TTS Engine (Qwen3-TTS)
+        │                         ├──► TTS Engine (Kokoro-ONNX)
         │                         ├──► Wake Word (Vosk)
         │                         ├──► YouTube Controller
         │                         ├──► Media Controller
@@ -75,7 +75,7 @@ Esta carpeta contiene toda la documentación técnica y de usuario del proyecto:
 
 | Componente | Estado | Versión |
 |------------|--------|---------|
-| Core IA (Mistral 7B) | ✅ Completo | 3.0 |
+| Core IA (Qwen3 0.6B) | ✅ Completo | 3.0 |
 | Inteligencia Emocional | ✅ Completo | 3.0 |
 | Reconocimiento de Voz (Vosk) | ✅ Completo | 3.0 |
 | Control de YouTube/Medios | ✅ Completo | 3.0 |
@@ -93,7 +93,7 @@ Esta carpeta contiene toda la documentación técnica y de usuario del proyecto:
 - **Pydantic 2.10.5** - Validación de datos
 
 ### Inteligencia Artificial
-- **Mistral 7B** - Modelo de lenguaje vía Ollama
+- **Qwen3 0.6B** - Modelo de lenguaje vía Ollama
 - **TextBlob 0.19.0** - Análisis de sentimientos
 
 ### Reconocimiento de Voz
@@ -104,7 +104,7 @@ Esta carpeta contiene toda la documentación técnica y de usuario del proyecto:
 - **PyAutoGUI 0.9.54** - Automatización de teclado
 
 ### Texto a Voz
-- **Qwen3-TTS** - Síntesis de voz neuronal
+- **Kokoro-ONNX** - Síntesis de voz neuronal
 - **torch** - Motor de inferencia
 - **soundfile** - Procesamiento de audio
 
@@ -119,7 +119,7 @@ Esta carpeta contiene toda la documentación técnica y de usuario del proyecto:
 - ✅ Reconocimiento de voz 100% offline con Vosk
 - ✅ Wake word "LILY" completamente local
 - ✅ Control de YouTube y medios por voz
-- ✅ Integración con Mistral 7B vía Ollama
+- ✅ Integración con Qwen3 0.6B vía Ollama
 - ✅ Sistema de memoria persistente
 - ✅ Inteligencia emocional avanzada
 - ✅ Interfaz web con tema anime
@@ -157,7 +157,7 @@ Ver archivo [`../LICENSE`](../LICENSE) para más detalles.
 ## 💕 Agradecimientos
 
 - **LilyBell** - Inspiración para el proyecto
-- **Mistral AI** - Modelo de lenguaje
+- **Qwen3** - Modelo de lenguaje
 - **Ollama** - Ejecución local de modelos
 - **Vosk** - Reconocimiento de voz offline
 

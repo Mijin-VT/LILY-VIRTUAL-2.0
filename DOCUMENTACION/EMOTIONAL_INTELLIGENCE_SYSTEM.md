@@ -459,7 +459,7 @@ def generate_response_with_context(self, user_message: str, user_id: str, emotio
     response = requests.post(
         f"{self.ollama_url}/api/chat",
         json={
-            "model": "mistral:7b",
+            "model": "huihui_ai/qwen3-abliterated:0.6b",
             "messages": messages,
             "stream": False,
             "options": {

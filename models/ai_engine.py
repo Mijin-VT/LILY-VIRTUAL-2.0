@@ -25,7 +25,7 @@ class AIEngine:
         Inicializa el motor de IA
         """
         self.ollama_url = ollama_url
-        self.model = os.environ.get("LILY_MODEL", "mistral:7b")
+        self.model = os.environ.get("LILY_MODEL", "huihui_ai/qwen3-abliterated:0.6b")
         self._verify_model()
         
         # Sistemas principales

@@ -74,7 +74,7 @@ pip install -r requirements.txt
 # Extraer en: models/vosk-model-small-es-0.42/
 
 # 5. Instalar modelo Ollama
-ollama pull mistral
+ollama pull huihui_ai/qwen3-abliterated:0.6b
 
 # 6. Iniciar el sistema
 INICIAR_LILY.bat
@@ -144,7 +144,7 @@ pip install pyaudio
 ollama serve &
 
 # 6. Descargar modelo
-ollama pull mistral
+ollama pull huihui_ai/qwen3-abliterated:0.6b
 
 # 7. Iniciar Lily
 python main.py
@@ -218,7 +218,7 @@ pip install pyaudio
 ollama serve &
 
 # 6. Descargar modelo
-ollama pull mistral
+ollama pull huihui_ai/qwen3-abliterated:0.6b
 
 # 7. Iniciar Lily
 python main.py

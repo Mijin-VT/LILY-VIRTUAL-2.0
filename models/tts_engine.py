@@ -1,21 +1,33 @@
 import os
 import hashlib
+import random
+import numpy as np
+import requests
+import traceback
 from gtts import gTTS
 from pydub import AudioSegment
-# pydub no tiene pitch_shift nativo, usaremos manipulación de frame_rate
-import random
+
+try:
+    from kokoro_onnx import Kokoro
+    KOKORO_AVAILABLE = True
+except ImportError:
+    KOKORO_AVAILABLE = False
 
 
 class TTSEngine:
-    """Motor de texto a voz con personalización de voz"""
+    """Motor de texto a voz con personalización de voz usando Kokoro y fallback a gTTS"""
     
     def __init__(self, audio_dir: str = "static/audio", reference_audio_dir: str = "audio_samples"):
         self.audio_dir = audio_dir
         self.reference_audio_dir = reference_audio_dir
         os.makedirs(audio_dir, exist_ok=True)
         
+        # Rutas de modelos Kokoro
+        self.model_path = os.path.join("models", "kokoro-v1.0.onnx")
+        self.voices_path = os.path.join("models", "voices-v1.0.bin")
+        self.kokoro = None
+        
         # Parámetros de voz basados en análisis de muestras
-        # Estos valores simulan características de voz femenina joven
         self.voice_params = {
             "speed": 1.1,  # Ligeramente más rápido
             "pitch_shift": 2,  # Tono más alto (voz femenina)
@@ -31,6 +43,57 @@ class TTSEngine:
                 "sorprendida": {"speed": 1.15, "pitch": 4}
             }
         }
+        
+        # Inicializar Kokoro
+        if KOKORO_AVAILABLE:
+            self.init_kokoro()
+        else:
+            print("Librería kokoro-onnx no disponible. Usando gTTS de forma predeterminada.")
+            
+    def download_models(self):
+        """Descarga los modelos necesarios de Kokoro desde GitHub de forma segura"""
+        model_url = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"
+        voices_url = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
+        
+        os.makedirs("models", exist_ok=True)
+        
+        def download_file(url, dest):
+            if os.path.exists(dest):
+                return
+            print(f"Descargando archivo necesario de Kokoro: {os.path.basename(dest)}...")
+            try:
+                r = requests.get(url, stream=True)
+                r.raise_for_status()
+                with open(dest, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                print(f"Archivo {os.path.basename(dest)} descargado con éxito.")
+            except Exception as e:
+                print(f"Error al descargar {url}: {e}")
+                if os.path.exists(dest):
+                    os.remove(dest)
+                raise e
+
+        try:
+            download_file(model_url, self.model_path)
+            download_file(voices_url, self.voices_path)
+        except Exception as e:
+            print(f"Fallo al descargar los archivos del modelo Kokoro: {e}")
+            raise e
+
+    def init_kokoro(self):
+        """Inicializa el motor de Kokoro TTS, descargando los modelos si es necesario"""
+        try:
+            if not os.path.exists(self.model_path) or not os.path.exists(self.voices_path):
+                self.download_models()
+            
+            print("Cargando modelo Kokoro TTS en ONNX...")
+            self.kokoro = Kokoro(self.model_path, self.voices_path)
+            print("Motor Kokoro TTS cargado exitosamente.")
+        except Exception as e:
+            print(f"No se pudo inicializar Kokoro TTS. Se utilizará gTTS como alternativa. Error: {e}")
+            self.kokoro = None
     
     def generate_audio_filename(self, text: str) -> str:
         """Genera un nombre de archivo único basado en el texto y timestamp"""
@@ -41,7 +104,7 @@ class TTSEngine:
     
     def text_to_speech(self, text: str, emotion: str = "neutral", save: bool = True) -> str:
         """
-        Convierte texto a voz con características emocionales
+        Convierte texto a voz con características emocionales usando Kokoro y fallback a gTTS
         
         Args:
             text: Texto a convertir
@@ -60,7 +123,56 @@ class TTSEngine:
             if os.path.exists(output_path):
                 return f"/static/audio/{filename}"
             
-            # Generar audio base con gTTS
+            # Obtener parámetros de emoción
+            emotion_params = self.voice_params["emotion_modifiers"].get(
+                emotion, 
+                self.voice_params["emotion_modifiers"]["neutral"]
+            )
+            
+            # 1. INTENTO CON KOKORO ONNX (LOCAL)
+            if self.kokoro:
+                try:
+                    # Generar audio con Kokoro
+                    samples, sample_rate = self.kokoro.create(
+                        text,
+                        voice="ef_dora",
+                        speed=emotion_params["speed"],
+                        lang="es"
+                    )
+                    
+                    # Convertir array float32 de numpy a 16-bit PCM bytes
+                    audio_bytes = (samples * 32767).astype(np.int16).tobytes()
+                    
+                    # Cargar a pydub
+                    audio = AudioSegment(
+                        data=audio_bytes,
+                        sample_width=2,
+                        frame_rate=sample_rate,
+                        channels=1
+                    )
+                    
+                    # Ajustar volumen según emoción
+                    volume_adjustments = {
+                        "feliz": 2,
+                        "enojada": 3,
+                        "emocionada": 4,
+                        "triste": -2,
+                        "preocupada": -1
+                    }
+                    
+                    volume_change = volume_adjustments.get(emotion, 0)
+                    if volume_change != 0:
+                        audio = audio + volume_change
+                        
+                    # Exportar archivo procesado como MP3
+                    audio.export(output_path, format="mp3", bitrate="128k")
+                    return f"/static/audio/{filename}"
+                    
+                except Exception as ex_kokoro:
+                    print(f"Error generando audio con Kokoro: {ex_kokoro}. Recurriendo a gTTS de respaldo...")
+                    # Continuar al fallback de gTTS
+            
+            # 2. FALLBACK A gTTS (ONLINE)
             temp_file = os.path.join(self.audio_dir, f"temp_{filename}")
             tts = gTTS(text=text, lang='es', slow=False)
             tts.save(temp_file)
@@ -68,25 +180,14 @@ class TTSEngine:
             # Cargar audio con pydub
             audio = AudioSegment.from_mp3(temp_file)
             
-            # Obtener parámetros de emoción
-            emotion_params = self.voice_params["emotion_modifiers"].get(
-                emotion, 
-                self.voice_params["emotion_modifiers"]["neutral"]
-            )
-            
             # Aplicar modificaciones de velocidad
             if emotion_params["speed"] != 1.0:
-                # Cambiar velocidad manteniendo el pitch
                 audio = audio._spawn(
                     audio.raw_data,
                     overrides={
                         "frame_rate": int(audio.frame_rate * emotion_params["speed"])
                     }
                 ).set_frame_rate(audio.frame_rate)
-            
-            # Aplicar cambio de pitch (simulación de voz femenina)
-            # Nota: pydub no tiene pitch_shift nativo, usamos cambio de velocidad
-            # Para pitch real se necesitaría librosa o similar
             
             # Ajustar volumen según emoción
             volume_adjustments = {
@@ -112,13 +213,13 @@ class TTSEngine:
             
         except Exception as e:
             print(f"Error generando audio: {e}")
+            traceback.print_exc()
             return None
     
     def generate_speech_async(self, text: str, emotion: str = "neutral"):
         """
         Versión asíncrona para generar voz en background
         """
-        # Para implementación futura con threading o asyncio
         return self.text_to_speech(text, emotion)
     
     def delete_audio_file(self, audio_url: str) -> bool:
@@ -166,7 +267,6 @@ class TTSEngine:
     def analyze_reference_audio(self):
         """
         Analiza los archivos de audio de referencia para extraer características
-        (Implementación básica - para análisis avanzado se necesitaría librosa)
         """
         try:
             lily_audio = os.path.join(self.reference_audio_dir, "LILY.wav")
@@ -198,4 +298,3 @@ class TTSEngine:
 
 # Instancia global
 tts_engine = TTSEngine()
-

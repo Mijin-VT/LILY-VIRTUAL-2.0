@@ -24,7 +24,7 @@
 | Componente | Requisito Mínimo | Notas |
 |------------|------------------|-------|
 | **Procesador** | CPU de 64 bits Quad-core (Intel i3 / AMD Ryzen 3) | Arquitectura x86_64 requerida, 2.0 GHz o superior |
-| **Memoria RAM** | 8 GB | Mínimo para ejecución de modelo Mistral 7B |
+| **Memoria RAM** | 8 GB | Mínimo para ejecución de modelo Qwen3 0.6B |
 | **Almacenamiento** | 8 GB libres | Espacio para instalación, modelos Ollama y caché |
 | **Micrófono** | Sí | Requerido para reconocimiento de voz |
 | **Altavoces** | Sí | Para salida de audio TTS |
@@ -110,8 +110,8 @@
 | **vosk** | 0.3.45 | Reconocimiento de voz offline | Requerido |
 | **pyaudio** | 0.2.14 | Captura de audio del micrófono | Requerido |
 | **pyautogui** | 0.9.54 | Control de teclado (YouTube/medios) | Requerido |
-| **qwen-tts** | latest | Texto a voz neuronal | Requerido |
-| **torch** | latest | Motor de inferencia de IA | Requerido |
+| **kokoro-onnx** | 0.5.0 | Texto a voz neuronal local | Requerido |
+| **onnxruntime** | latest | Motor de inferencia ONNX para Kokoro | Requerido |
 | **soundfile** | latest | Procesamiento de audio | Requerido |
 | **chromadb** | 0.4.22 | Base de datos vectorial | Requerido |
 | **textblob** | 0.19.0 | Análisis de sentimientos | Requerido |
@@ -131,7 +131,7 @@
 | **FFmpeg** | 4.0+ | Procesamiento de audio/video | Opcional |
 | **PortAudio** | 19.7+ | Soporte de audio | Requerido por PyAudio |
 | **Transformers** | 4.0+ | Personalización avanzada del modelo | Opcional |
-| **PyTorch** | 1.0+ | Motor de inferencia para Qwen3-TTS | Requerido |
+| **PyTorch** | 1.0+ | Motor de inferencia para Kokoro TTS | Requerido |
 | **FlashAttention 2** | latest | Optimización de memoria GPU | Opcional |
 
 ---
@@ -289,7 +289,7 @@ ollama --version
 ollama list
 
 # Verificar dependencias
-python -c "import fastapi, vosk, pyaudio, pyautogui, soundfile; print('✓ Todas las dependencias están instaladas')"
+python -c "import fastapi, pyaudio, pyautogui, soundfile, kokoro_onnx; print('✓ Todas las dependencias están instaladas')"
 ```
 
 ### Verificación Manual
@@ -298,7 +298,7 @@ python -c "import fastapi, vosk, pyaudio, pyautogui, soundfile; print('✓ Todas
 2. **Ollama**: Ejecuta `ollama serve` y verifica que inicie
 3. **Micrófono**: Prueba en otra aplicación
 4. **Navegador**: Asegúrate de que Microsoft Edge esté instalado
-5. **Conexión**: Verifica acceso a internet para descarga inicial del modelo Qwen3-TTS
+5. **Conexión**: Verifica acceso a internet para descarga inicial de modelos de voz Kokoro TTS
 
 ---
 
