@@ -20,7 +20,6 @@ class EmotionType(Enum):
     JUGUETONA = "juguetona"
     PREOCUPADA = "preocupada"
     SORPRENDIDA = "sorprendida"
-    EXCITADA = "excitada"
     AMOROSA = "amorosa"
 
 @dataclass
@@ -100,11 +99,6 @@ class AdvancedEmotionalIntelligence:
                 'sorpresa', 'sorprendido', 'increíble', 'asombro', 'asombrado',
                 'impresionante', 'increíble', 'asombroso', 'sorprendente',
                 'extraordinario', 'inexplicable', 'asombroso', 'sorpresivo'
-            ],
-            EmotionType.EXCITADA.value: [
-                'excitado', 'excitada', 'deseo', 'atractivo', 'interés',
-                'fascinante', 'atraído', 'interesante', 'atractivo', 'seductor',
-                'tentador', 'provocativo', 'sensual', 'apasionado', 'ardiente'
             ],
             EmotionType.AMOROSA.value: [
                 'amor', 'pasión', 'amorosa', 'apasionado', 'devoción',
@@ -513,7 +507,6 @@ class AdvancedEmotionalIntelligence:
             EmotionType.JUGUETONA.value: f"Usa un tono {'' if intensity < 0.7 else 'muy '}juguetón y travieso.",
             EmotionType.PREOCUPADA.value: f"Muestra preocupación y ofrece apoyo emocional.",
             EmotionType.SORPRENDIDA.value: f"Muestra curiosidad y asombro {'' if intensity < 0.7 else 'intenso'}.",
-            EmotionType.EXCITADA.value: f"Habla con {'' if intensity < 0.7 else 'mucha '}intensidad y atracción.",
             EmotionType.AMOROSA.value: f"Expresa amor y pasión {'' if intensity < 0.7 else 'intensa'}.",
             EmotionType.NEUTRAL.value: f"Mantén un tono equilibrado y neutral."
         }
