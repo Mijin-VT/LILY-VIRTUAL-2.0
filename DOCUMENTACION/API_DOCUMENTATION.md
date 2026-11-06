@@ -42,26 +42,29 @@ Envía un mensaje y recibe una respuesta de Lily con análisis emocional y audio
 ## 2. Configuración y Preferencias de Usuario
 
 ### GET `/api/preferences/{user_id}`
-Obtiene el nombre de usuario configurado y el estado de la integración con Gmail.
+Obtiene el nombre de usuario configurado y el estado de las integraciones con Gmail y Gemini.
 
 **Response (200 OK)**:
 ```json
 {
   "gmail_user": "correo_usuario@gmail.com",
   "has_password": true,
-  "user_name": "Mijin"
+  "user_name": "Mijin",
+  "has_gemini_key": true,
+  "gemini_key_preview": "AIzaSy...a1b2"
 }
 ```
 
 ### POST `/api/preferences/{user_id}`
-Guarda o actualiza las preferencias del usuario (nombre y credenciales de Gmail).
+Guarda o actualiza las preferencias del usuario (nombre, credenciales de Gmail y clave API de Gemini).
 
 **Request Body**:
 ```json
 {
   "user_name": "Kinetic",
   "gmail_user": "correo_usuario@gmail.com",
-  "gmail_password": "tu_clave_de_aplicacion"
+  "gmail_password": "tu_clave_de_aplicacion",
+  "gemini_api_key": "AIzaSy..."
 }
 ```
 
@@ -70,6 +73,29 @@ Guarda o actualiza las preferencias del usuario (nombre y credenciales de Gmail)
 {
   "status": "success",
   "message": "Preferencias actualizadas"
+}
+```
+
+> **Proveedor de LLM**: si el usuario tiene `gemini_api_key` configurada, Lily usa los modelos de Google Gemini (por defecto `gemini-3.5-flash-lite`, con respaldo automático a `gemini-3.6-flash` y `gemini-3.8-flash`; configurable con la preferencia `gemini_model` o la variable de entorno `LILY_GEMINI_MODEL`). Si un modelo no está disponible o devuelve `504 DEADLINE_EXCEEDED`, se prueba el siguiente automáticamente. Si Gemini falla o no hay clave, se usa Ollama automáticamente como respaldo.
+
+> **Formatos de clave**: Google AI Studio ahora emite claves de autorización (*auth keys*) que empiezan por `AQ.`. Las claves estándar anteriores empiezan por `AIza`. Lily acepta ambos formatos y envía la clave a Google mediante la cabecera `x-goog-api-key`.
+
+### POST `/api/gemini/test/{user_id}`
+Prueba la conexión con Gemini usando la clave API guardada. Se ejecuta en un hilo aparte para no bloquear el servidor.
+
+**Response (200 OK)**:
+```json
+{
+  "status": "success",
+  "model": "gemini-3.5-flash-lite",
+  "response": "OK"
+}
+```
+
+**Response (400 Bad Request)**: si no hay clave configurada o la clave no es válida.
+```json
+{
+  "detail": "Error conectando con Gemini: API key not valid..."
 }
 ```
 

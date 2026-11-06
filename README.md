@@ -31,6 +31,7 @@ Lily es una compañera virtual con inteligencia emocional avanzada, personalidad
 - Panel de Configuración UI para subir y gestionar documentos de texto, artículos o PDFs (RAG local).
 - Cambia tu nombre directamente en el panel de configuración (cambia el saludo ¡Hola [Nombre]! de la interfaz y la forma en que Lily se dirige a ti).
 - Registra tu cuenta y contraseña de aplicación de Gmail de manera sencilla en el formulario.
+- Configura tu clave API de Gemini (Google AI Studio) desde el panel; Lily usará los modelos de Google y volverá a Ollama automáticamente si no hay clave o si Gemini falla.
 - Botón de cambio de tema Claro / Oscuro en el cabecero para proteger tu visión.
 - **Botón de Comandos**: Abre un modal detallado interactivo (`📋 Comandos`) que lista todas las funciones por categoría (multimedia, recordatorios, correos, búsquedas) con ejemplos claros.
 
@@ -355,7 +356,7 @@ uvicorn.run("main:app", host="0.0.0.0", port=8000)  # Cambiar 8000 por otro puer
 ```
 
 ### Modificar la personalidad
-Editar `models/ai_engine.py`, variable `base_system_prompt`
+Editar `models/system_prompt.txt` (prompt principal). El ensamblado dinámico con memoria, RAG y emociones está en `models/context_manager.py`.
 
 ### Ajustar parámetros de voz
 Editar `models/tts_engine.py`, diccionario `voice_params`

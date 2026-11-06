@@ -57,3 +57,9 @@ temp/
 *.tmp
 
 
+
+# Sesiones SSE (datos de usuario)
+data/sessions/
+
+# Sesiones SSE (datos de usuario)
+data/sessions/

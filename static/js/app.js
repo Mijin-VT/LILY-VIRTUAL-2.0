@@ -43,6 +43,12 @@ const elements = {
     gmailPasswordInput: document.getElementById('gmailPasswordInput'),
     saveGmailBtn: document.getElementById('saveGmailBtn'),
     gmailConfigStatus: document.getElementById('gmailConfigStatus'),
+    geminiApiKeyInput: document.getElementById('geminiApiKeyInput'),
+    toggleGeminiKeyBtn: document.getElementById('toggleGeminiKeyBtn'),
+    saveGeminiKeyBtn: document.getElementById('saveGeminiKeyBtn'),
+    testGeminiKeyBtn: document.getElementById('testGeminiKeyBtn'),
+    deleteGeminiKeyBtn: document.getElementById('deleteGeminiKeyBtn'),
+    geminiKeyStatus: document.getElementById('geminiKeyStatus'),
     welcomeUserHeader: document.getElementById('welcomeUserHeader'),
     userNameInput: document.getElementById('userNameInput'),
     saveUserNameBtn: document.getElementById('saveUserNameBtn'),
@@ -247,6 +253,26 @@ function setupEventListeners() {
         elements.saveUserNameBtn.addEventListener('click', saveUserName);
     }
 
+    if (elements.saveGeminiKeyBtn) {
+        elements.saveGeminiKeyBtn.addEventListener('click', saveGeminiApiKey);
+    }
+
+    if (elements.deleteGeminiKeyBtn) {
+        elements.deleteGeminiKeyBtn.addEventListener('click', deleteGeminiApiKey);
+    }
+
+    if (elements.testGeminiKeyBtn) {
+        elements.testGeminiKeyBtn.addEventListener('click', testGeminiApiKey);
+    }
+
+    if (elements.geminiApiKeyInput) {
+        elements.geminiApiKeyInput.addEventListener('input', resetGeminiTestButton);
+    }
+
+    if (elements.toggleGeminiKeyBtn) {
+        elements.toggleGeminiKeyBtn.addEventListener('click', toggleGeminiKeyVisibility);
+    }
+
     window.addEventListener('click', (e) => {
         if (e.target === elements.memoryModal) {
             elements.memoryModal.style.display = 'none';
@@ -272,11 +298,12 @@ async function checkHealth() {
         const response = await fetch('/health');
         const data = await response.json();
 
-        state.isConnected = data.ollama_connected;
+        const llmAvailable = Boolean(data.ollama_connected || data.gemini_available);
+        state.isConnected = llmAvailable;
 
-        if (state.isConnected) {
+        if (llmAvailable) {
             elements.statusDot.classList.remove('disconnected');
-            elements.statusText.textContent = 'Conectada ✨';
+            elements.statusText.textContent = data.ollama_connected ? 'Conectada ✨' : 'Conectada (Gemini) ✨';
         } else {
             elements.statusDot.classList.add('disconnected');
             elements.statusText.textContent = 'Desconectada (Ollama offline)';
@@ -320,14 +347,14 @@ function adjustColor(color, amount) {
     );
 }
 
-// Enviar mensaje
+// Enviar mensaje (SSE streaming)
 async function sendMessage() {
     const message = elements.messageInput.value.trim();
 
     if (!message || state.isTyping) return;
 
     if (!state.isConnected) {
-        showNotification('⚠️ Sistema desconectado. Por favor espera...', 'warning');
+        showNotification('Sistema desconectado. Por favor espera...', 'warning');
         return;
     }
 
@@ -344,48 +371,164 @@ async function sendMessage() {
     state.isTyping = true;
     elements.sendButton.disabled = true;
 
+    // Guardar timestamp de inicio para replay
+    state.lastStreamTs = Date.now() / 1000;
+
     try {
-        const response = await fetch('/api/chat', {
+        // --- SSE streaming via fetch ReadableStream ---
+        const response = await fetch('/api/chat/stream', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: message,
-                user_id: state.userId
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, user_id: state.userId })
         });
 
-        if (!response.ok) {
-            throw new Error('Error en la respuesta del servidor');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let msgDiv = null;       // burbuja de mensaje de Lily (streaming)
+        let msgTextEl = null;    // elemento de texto dentro de la burbuja
+        let fullText = '';
+        let audioPlayed = false;
+
+        // Ocultar typing indicator cuando empiece a llegar texto
+        let typingHidden = false;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // ultima linea puede estar incompleta
+
+            for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const raw = line.slice(5).trim();
+                if (!raw) continue;
+
+                let evt;
+                try { evt = JSON.parse(raw); } catch { continue; }
+
+                if (evt.type === 'token') {
+                    // Ocultar typing indicator al primer token
+                    if (!typingHidden) {
+                        hideTypingIndicator();
+                        typingHidden = true;
+                        // Crear burbuja de mensaje vacia (se llenara progresivamente)
+                        msgDiv = createStreamingMessageBubble();
+                        msgTextEl = msgDiv.querySelector('.stream-text');
+                    }
+                    fullText += evt.content;
+                    if (msgTextEl) msgTextEl.textContent = fullText;
+                    // Auto-scroll
+                    elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+
+                } else if (evt.type === 'emotion') {
+                    updateEmotionDisplay(evt.value);
+
+                } else if (evt.type === 'audio' && !audioPlayed) {
+                    audioPlayed = true;
+                    playAudio(evt.url);
+
+                } else if (evt.type === 'done') {
+                    // Finalizar burbuja con hora
+                    if (msgDiv) finalizeStreamingBubble(msgDiv, fullText);
+                    if (!typingHidden) hideTypingIndicator();
+                    break;
+                }
+            }
         }
 
-        const data = await response.json();
-
-        // Ocultar indicador de escritura
-        hideTypingIndicator();
-
-        // Mostrar respuesta
-        addMessage('assistant', data.response, data.emotion);
-
-        // Actualizar emoción
-        updateEmotionDisplay(data.emotion);
-
-        // Reproducir audio si está disponible
-        if (data.audio_url) {
-            playAudio(data.audio_url);
+        // Si nunca llego audio via SSE pero hay texto, generar TTS del texto completo
+        if (!audioPlayed && fullText.trim()) {
+            try {
+                const ttsResp = await fetch('/api/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: fullText.trim(), emotion: state.currentEmotion })
+                });
+                if (ttsResp.ok) {
+                    const ttsData = await ttsResp.json();
+                    if (ttsData.audio_url) playAudio(ttsData.audio_url);
+                }
+            } catch (_) {}
         }
 
     } catch (error) {
-        console.error('Error enviando mensaje:', error);
-        hideTypingIndicator();
-        addMessage('assistant', 'Ay Mijin, algo salió mal... 😢 ¿Podrías intentar de nuevo?', 'preocupada');
+        console.error('Error en SSE, fallback a /api/chat:', error);
+        // --- Fallback al endpoint blocking original ---
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, user_id: state.userId })
+            });
+            if (!resp.ok) throw new Error('Error en la respuesta del servidor');
+            const data = await resp.json();
+            hideTypingIndicator();
+            addMessage('assistant', data.response, data.emotion);
+            updateEmotionDisplay(data.emotion);
+            if (data.audio_url) playAudio(data.audio_url);
+        } catch (fallbackErr) {
+            console.error('Error en fallback:', fallbackErr);
+            hideTypingIndicator();
+            addMessage('assistant', 'Ay, algo salio mal... Intenta de nuevo.', 'preocupada');
+        }
     } finally {
         state.isTyping = false;
         elements.sendButton.disabled = false;
         elements.messageInput.focus();
     }
 }
+
+// Crear burbuja de mensaje de Lily para streaming progresivo
+function createStreamingMessageBubble() {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message assistant streaming';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = '🌸';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    const text = document.createElement('div');
+    text.className = 'stream-text';
+    text.textContent = '';
+
+    contentDiv.appendChild(text);
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(contentDiv);
+
+    const welcomeMsg = elements.chatContainer.querySelector('.welcome-message');
+    if (welcomeMsg) welcomeMsg.remove();
+
+    elements.chatContainer.appendChild(messageDiv);
+    elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+    return messageDiv;
+}
+
+// Finalizar burbuja de streaming: agregar hora y quitar clase streaming
+function finalizeStreamingBubble(messageDiv, finalText) {
+    messageDiv.classList.remove('streaming');
+    const contentDiv = messageDiv.querySelector('.message-content');
+    if (contentDiv) {
+        // Agregar hora
+        const existing = contentDiv.querySelector('.message-time');
+        if (!existing) {
+            const time = document.createElement('div');
+            time.className = 'message-time';
+            time.textContent = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            contentDiv.appendChild(time);
+        }
+    }
+    elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+}
+
+
 
 // Agregar mensaje al chat
 function addMessage(role, content, emotion = null) {
@@ -1046,6 +1189,27 @@ async function loadUserPreferences() {
         if (elements.userNameInput) {
             elements.userNameInput.value = state.userName;
         }
+
+        // 3. Cargar estado de la clave API de Gemini
+        if (elements.geminiApiKeyInput) {
+            elements.geminiApiKeyInput.value = "";
+            elements.geminiApiKeyInput.type = 'password';
+            if (elements.toggleGeminiKeyBtn) elements.toggleGeminiKeyBtn.textContent = '👁️';
+            if (data.has_gemini_key) {
+                const preview = data.gemini_key_preview || "****";
+                elements.geminiApiKeyInput.placeholder = `******** (Clave guardada: ${preview})`;
+                if (elements.geminiKeyStatus) {
+                    elements.geminiKeyStatus.className = "status-msg success";
+                    elements.geminiKeyStatus.textContent = `✅ Clave configurada: ${preview} · Lily usará Gemini`;
+                }
+            } else {
+                elements.geminiApiKeyInput.placeholder = "AIzaSy... o AQ.Ab8...";
+                if (elements.geminiKeyStatus) {
+                    elements.geminiKeyStatus.className = "status-msg";
+                    elements.geminiKeyStatus.textContent = "Aún no has configurado una clave de Gemini.";
+                }
+            }
+        }
         if (elements.welcomeUserHeader) {
             elements.welcomeUserHeader.innerHTML = `¡Hola ${state.userName}! 💞`;
         }
@@ -1138,6 +1302,157 @@ async function saveUserName() {
         elements.userNameStatus.textContent = `❌ Error: ${error.message}`;
     } finally {
         elements.saveUserNameBtn.disabled = false;
+    }
+}
+
+// Guardar la clave API de Gemini (Google AI Studio) en SQLite
+async function saveGeminiApiKey() {
+    try {
+        if (!elements.geminiApiKeyInput) return;
+
+        resetGeminiTestButton();
+
+        const apiKey = elements.geminiApiKeyInput.value.trim();
+
+        if (!apiKey) {
+            elements.geminiKeyStatus.className = "status-msg error";
+            elements.geminiKeyStatus.textContent = "❌ Escribe tu clave API de Gemini antes de guardar.";
+            return;
+        }
+
+        const looksLikeGoogleKey =
+            /^[A-Za-z0-9._-]{20,}$/.test(apiKey) &&
+            (apiKey.startsWith("AIza") || apiKey.startsWith("AQ."));
+
+        if (!looksLikeGoogleKey) {
+            elements.geminiKeyStatus.className = "status-msg error";
+            elements.geminiKeyStatus.textContent = "❌ La clave no parece válida. Debe ser una clave de Google AI Studio (empieza por 'AIza' o 'AQ.').";
+            return;
+        }
+
+        elements.geminiKeyStatus.className = "status-msg";
+        elements.geminiKeyStatus.textContent = "Guardando clave...";
+        elements.saveGeminiKeyBtn.disabled = true;
+
+        const response = await fetch(`/api/preferences/${state.userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ "gemini_api_key": apiKey })
+        });
+
+        if (!response.ok) throw new Error('Error al guardar la clave');
+
+        elements.geminiApiKeyInput.value = "";
+        elements.geminiApiKeyInput.type = 'password';
+        if (elements.toggleGeminiKeyBtn) elements.toggleGeminiKeyBtn.textContent = '👁️';
+
+        await loadUserPreferences();
+
+        elements.geminiKeyStatus.className = "status-msg success";
+        elements.geminiKeyStatus.textContent = "✅ Clave API de Gemini guardada correctamente";
+    } catch (error) {
+        console.error('Error guardando la clave de Gemini:', error);
+        elements.geminiKeyStatus.className = "status-msg error";
+        elements.geminiKeyStatus.textContent = `❌ Error: ${error.message}`;
+    } finally {
+        if (elements.saveGeminiKeyBtn) elements.saveGeminiKeyBtn.disabled = false;
+    }
+}
+
+// Eliminar la clave API de Gemini guardada
+async function deleteGeminiApiKey() {
+    try {
+        resetGeminiTestButton();
+
+        elements.geminiKeyStatus.className = "status-msg";
+        elements.geminiKeyStatus.textContent = "Eliminando clave...";
+        elements.deleteGeminiKeyBtn.disabled = true;
+
+        const response = await fetch(`/api/preferences/${state.userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ "gemini_api_key": "" })
+        });
+
+        if (!response.ok) throw new Error('Error al eliminar la clave');
+
+        await loadUserPreferences();
+
+        elements.geminiKeyStatus.className = "status-msg success";
+        elements.geminiKeyStatus.textContent = "🗑️ Clave API de Gemini eliminada";
+    } catch (error) {
+        console.error('Error eliminando la clave de Gemini:', error);
+        elements.geminiKeyStatus.className = "status-msg error";
+        elements.geminiKeyStatus.textContent = `❌ Error: ${error.message}`;
+    } finally {
+        if (elements.deleteGeminiKeyBtn) elements.deleteGeminiKeyBtn.disabled = false;
+    }
+}
+
+// Restablecer el botón "Probar" a su estado normal
+function resetGeminiTestButton() {
+    if (!elements.testGeminiKeyBtn) return;
+    elements.testGeminiKeyBtn.classList.remove('test-ok', 'test-fail');
+    elements.testGeminiKeyBtn.textContent = 'Probar';
+    elements.testGeminiKeyBtn.disabled = false;
+}
+
+// Probar la conexión con Gemini usando la clave guardada
+async function testGeminiApiKey() {
+    try {
+        const pendingKey = elements.geminiApiKeyInput ? elements.geminiApiKeyInput.value.trim() : "";
+        if (pendingKey) {
+            // Guardar primero para probar exactamente la clave escrita
+            await saveGeminiApiKey();
+            if (elements.geminiKeyStatus && elements.geminiKeyStatus.classList.contains('error')) {
+                elements.testGeminiKeyBtn.classList.add('test-fail');
+                elements.testGeminiKeyBtn.textContent = '❌ Error';
+                return;
+            }
+        }
+
+        resetGeminiTestButton();
+        elements.geminiKeyStatus.className = "status-msg";
+        elements.geminiKeyStatus.textContent = "Probando conexión con Gemini...";
+        elements.testGeminiKeyBtn.disabled = true;
+        elements.testGeminiKeyBtn.textContent = "Probando...";
+
+        const response = await fetch(`/api/gemini/test/${state.userId}`, { method: 'POST' });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data.detail || 'No se pudo conectar con Gemini');
+        }
+
+        elements.testGeminiKeyBtn.classList.add('test-ok');
+        elements.testGeminiKeyBtn.textContent = '✅ Funciona';
+        elements.geminiKeyStatus.className = "status-msg success";
+        elements.geminiKeyStatus.textContent = `✅ Gemini respondió correctamente${data.model ? ` (${data.model})` : ''}`;
+    } catch (error) {
+        console.error('Error probando la clave de Gemini:', error);
+        if (elements.testGeminiKeyBtn) {
+            elements.testGeminiKeyBtn.classList.remove('test-ok');
+            elements.testGeminiKeyBtn.classList.add('test-fail');
+            elements.testGeminiKeyBtn.textContent = '❌ Error';
+        }
+        elements.geminiKeyStatus.className = "status-msg error";
+        elements.geminiKeyStatus.textContent = `❌ ${error.message}`;
+    } finally {
+        if (elements.testGeminiKeyBtn) elements.testGeminiKeyBtn.disabled = false;
+    }
+}
+
+// Mostrar u ocultar la clave API de Gemini mientras se escribe
+function toggleGeminiKeyVisibility() {
+    if (!elements.geminiApiKeyInput) return;
+    const isPassword = elements.geminiApiKeyInput.type === 'password';
+    elements.geminiApiKeyInput.type = isPassword ? 'text' : 'password';
+    if (elements.toggleGeminiKeyBtn) {
+        elements.toggleGeminiKeyBtn.textContent = isPassword ? '🙈' : '👁️';
     }
 }
 

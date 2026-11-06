@@ -2,39 +2,43 @@ import sqlite3
 import os
 import uuid
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import chromadb
 from chromadb.utils import embedding_functions
 from models.schemas import EmotionalState
+from models.graph_memory import GraphMemorySystem
 
 class MemorySystem:
-    """Sistema de memoria de largo plazo que integra SQLite y ChromaDB para almacenamiento semántico"""
-    
+    """Sistema de memoria de largo plazo que integra SQLite, ChromaDB y FalkorDB (GraphRAG)"""
+
     def __init__(self, data_dir: str = "data"):
         self.data_dir = data_dir
         self.db_path = os.path.join(data_dir, "lily_memory.db")
-        
+
         # Crear directorio si no existe
         os.makedirs(data_dir, exist_ok=True)
-        
+
         # Inicializar base de datos SQLite
         self._init_sqlite()
-        
+
         # Inicializar cliente de ChromaDB
         self.chroma_path = os.path.join(data_dir, "chroma_db")
         self.chroma_client = chromadb.PersistentClient(path=self.chroma_path)
-        
+
         # Usar la misma función de embeddings ligera multilingüe
         self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="paraphrase-multilingual-MiniLM-L12-v2"
         )
-        
+
         # Obtener o crear la colección para memorias a largo plazo
         self.chroma_collection = self.chroma_client.get_or_create_collection(
             name="lily_memories",
             embedding_function=self.embedding_fn
         )
-        
+
+        # Inicializar sistema de memoria en grafo FalkorDB (Knowledge Graph / GraphRAG)
+        self.graph_memory = GraphMemorySystem()
+
         print(f"MemorySystem SQLite inicializado en {self.db_path}")
         print(f"MemorySystem ChromaDB inicializado en {self.chroma_path} con {self.chroma_collection.count()} memorias semánticas.")
 
@@ -42,7 +46,7 @@ class MemorySystem:
         """Crea las tablas de SQLite si no existen"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         # Tabla para mensajes (historial)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS messages (
@@ -54,7 +58,7 @@ class MemorySystem:
                 timestamp TEXT
             )
         ''')
-        
+
         # Tabla para preferencias del usuario
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS preferences (
@@ -64,7 +68,7 @@ class MemorySystem:
                 PRIMARY KEY (user_id, key)
             )
         ''')
-        
+
         # Tabla para historial emocional
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS emotional_history (
@@ -76,14 +80,14 @@ class MemorySystem:
                 timestamp TEXT
             )
         ''')
-        
+
         conn.commit()
         conn.close()
 
     def add_message(self, user_id: str, role: str, content: str, emotion: Optional[str] = None, ai_engine=None):
         """Agrega un mensaje a la memoria en SQLite y lo indexa semánticamente en ChromaDB si es del usuario"""
         timestamp = datetime.now().isoformat()
-        
+
         # 1. Guardar en SQLite
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -92,12 +96,12 @@ class MemorySystem:
             (user_id, role, content, emotion, timestamp)
         )
         conn.commit()
-        
+
         # Contar total de mensajes para disparar el resumen automático
         cursor.execute("SELECT COUNT(*) FROM messages WHERE user_id = ?", (user_id,))
         message_count = cursor.fetchone()[0]
         conn.close()
-        
+
         # 2. Guardar en ChromaDB para búsqueda semántica si es mensaje del usuario
         if role == "user" and len(content.strip()) > 5:
             try:
@@ -113,7 +117,14 @@ class MemorySystem:
                 )
             except Exception as e:
                 print(f"Error indexando mensaje semánticamente en Chroma: {e}")
-        
+
+            # 2.1 Extraer y guardar hechos en el grafo de conocimiento FalkorDB (GraphRAG)
+            try:
+                user_name = self.get_preference(user_id, "user_name", "Mijin")
+                self.graph_memory.extract_and_store_facts(content, user_name=user_name)
+            except Exception as e:
+                print(f"Error indexando en grafo FalkorDB: {e}")
+
         # 3. Resumen automático cada 10 mensajes
         if message_count > 0 and message_count % 10 == 0 and ai_engine:
             self._generate_automatic_summary(user_id, ai_engine)
@@ -124,16 +135,16 @@ class MemorySystem:
             print(f"Generando resumen automático para {user_id}...")
             recent_messages = self.get_conversation_context(user_id, max_messages=10)
             context_text = "\n".join([f"{m['role']}: {m['content']}" for m in recent_messages])
-            
+
             prompt = f"Resume los puntos clave de esta conversación con {user_id} en 3 frases cortas:\n{context_text}"
-            
+
             import requests
             response = requests.post(
                 f"{ai_engine.ollama_url}/api/generate",
                 json={"model": ai_engine.model, "prompt": prompt, "stream": False},
                 timeout=15
             )
-            
+
             if response.status_code == 200:
                 summary = response.json().get("response", "")
                 self.update_preference(user_id, "conversation_summary", summary)
@@ -163,7 +174,7 @@ class MemorySystem:
         )
         rows = cursor.fetchall()
         conn.close()
-        
+
         formatted_messages = []
         for row in reversed(rows):
             formatted_messages.append({
@@ -194,6 +205,21 @@ class MemorySystem:
         conn.close()
         return row[0] if row else default
 
+    def has_any_preference_value(self, key: str) -> bool:
+        """True si algún usuario tiene un valor no vacío para la preferencia indicada"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT 1 FROM preferences WHERE key = ? AND value IS NOT NULL AND value != '' LIMIT 1",
+                (key,)
+            )
+            row = cursor.fetchone()
+            conn.close()
+            return row is not None
+        except Exception:
+            return False
+
     def get_emotional_summary(self, user_id: str) -> str:
         """Calcula el estado emocional dominante del usuario"""
         conn = sqlite3.connect(self.db_path)
@@ -204,15 +230,15 @@ class MemorySystem:
         )
         rows = cursor.fetchall()
         conn.close()
-        
+
         if not rows:
             return "No hay historial emocional previo."
-        
+
         emotions = [row[0] for row in rows]
         emotion_counts = {}
         for emotion in emotions:
             emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
-            
+
         dominant_emotion = max(emotion_counts, key=emotion_counts.get)
         return f"Emoción dominante reciente: {dominant_emotion}"
 
@@ -222,21 +248,21 @@ class MemorySystem:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM messages WHERE user_id = ?", (user_id,))
         total_messages = cursor.fetchone()[0]
-        
+
         cursor.execute("SELECT timestamp FROM messages WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user_id,))
         last_row = cursor.fetchone()
         conn.close()
-        
+
         if total_messages == 0:
             return "Primera conversación con el usuario."
-            
+
         last_interaction = last_row[0] if last_row else ""
         try:
             dt = datetime.fromisoformat(last_interaction)
             formatted_date = dt.strftime('%Y-%m-%d %H:%M')
         except:
             formatted_date = last_interaction
-            
+
         return f"Total de mensajes: {total_messages}. Última interacción: {formatted_date}"
 
     def get_semantic_memories(self, user_id: str, query: str, limit: int = 3) -> List[str]:
@@ -244,15 +270,30 @@ class MemorySystem:
         try:
             if self.chroma_collection.count() == 0:
                 return []
-                
+
             results = self.chroma_collection.query(
                 query_texts=[query],
                 n_results=limit,
                 where={"user_id": user_id}
             )
-            
+
             documents = results.get("documents", [])
             return documents[0] if documents else []
         except Exception as e:
             print(f"Error realizando consulta de memoria semántica: {e}")
             return []
+
+    def get_graph_memories(self, user_id: str, query: str, user_name: str = "Mijin") -> List[str]:
+        """Realiza una consulta a FalkorDB (GraphRAG) para obtener hechos estructurados y conexiones en grafo"""
+        try:
+            return self.graph_memory.query_context_for_message(query, user_name=user_name)
+        except Exception as e:
+            print(f"Error consultando memoria en grafo FalkorDB: {e}")
+            return []
+
+    def get_graph_stats(self) -> Dict[str, Any]:
+        """Obtiene estadísticas de FalkorDB (estado de conexión, cantidad de nodos y aristas)"""
+        try:
+            return self.graph_memory.get_graph_stats()
+        except Exception as e:
+            return {"status": "error", "error": str(e), "nodes": 0, "relationships": 0}

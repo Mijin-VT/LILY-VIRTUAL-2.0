@@ -4,18 +4,20 @@ if not hasattr(np, "float_"):
     np.float_ = np.float64
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
+import json
+import asyncio
 import logging
 import traceback
 from datetime import datetime
 
 # Sistema de Logs
 logging.basicConfig(
-    filename='lily_errors.log', 
+    filename='lily_errors.log',
     level=logging.ERROR,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
@@ -25,6 +27,7 @@ from models.schemas import ChatRequest, ChatResponse, EmotionType
 from models.tts_engine import TTSEngine
 from models.stt_engine import STTEngine
 from models.rag_engine import RAGEngine
+from models.session_cache import session_cache
 import shutil
 
 # Crear aplicación FastAPI
@@ -61,12 +64,14 @@ rag_engine = RAGEngine(knowledge_dir="knowledge")
 # Inicializar motor de TTS
 tts_engine = TTSEngine()
 
+# Conectar TTS al ai_engine para prefetch en streaming
+ai_engine._tts_engine_ref = tts_engine
+
 # Inicializar motor de STT (Faster Whisper)
 stt_engine = STTEngine(model_size="base", device="cuda", compute_type="float16")
 
 # Variable global para almacenar el último audio generado
 last_audio_path = None
-
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -83,31 +88,36 @@ async def read_root():
 async def health_check():
     """Verificar el estado del sistema"""
     ollama_status = ai_engine.check_ollama_connection()
-    
+    try:
+        gemini_status = ai_engine.gemini_client.has_any_configured_key()
+    except Exception:
+        gemini_status = False
+
     return {
-        "status": "healthy" if ollama_status else "degraded",
+        "status": "healthy" if (ollama_status or gemini_status) else "degraded",
         "ollama_connected": ollama_status,
+        "gemini_available": gemini_status,
         "timestamp": datetime.now().isoformat()
     }
 
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Endpoint principal de chat"""
+    """Endpoint principal de chat (blocking, retrocompatibilidad)"""
     try:
         # Generar respuesta
         response_text, emotion = ai_engine.generate_response(
-            request.message, 
+            request.message,
             request.user_id
         )
-        
+
         # Generar audio con TTS
         audio_url = None
         try:
             audio_url = tts_engine.text_to_speech(response_text, emotion.value)
         except Exception as e:
             print(f"Error generando audio: {e}")
-        
+
         # Preparar respuesta
         return ChatResponse(
             response=response_text,
@@ -115,17 +125,104 @@ async def chat(request: ChatRequest):
             audio_url=audio_url,
             timestamp=datetime.now().isoformat()
         )
-        
+
     except Exception as e:
         logging.error(f"Error en /api/chat: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error generando respuesta: {str(e)}")
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """Endpoint SSE fire-and-forget: emite tokens conforme los genera el LLM.
+
+    Eventos SSE emitidos:
+        data: {"type":"token",   "content":"<texto>"}
+        data: {"type":"emotion", "value":"<emocion>"}
+        data: {"type":"audio",   "url":"<url>"}
+        data: {"type":"done"}
+    """
+    async def event_generator():
+        loop = asyncio.get_event_loop()
+        try:
+            # Ejecutar el generador sincrono en un executor para no bloquear el event loop
+            def run_stream():
+                events = []
+                for evt in ai_engine.generate_response_stream(request.message, request.user_id):
+                    events.append(evt)
+                return events
+
+            # Stream progresivo: usar run_in_executor con queue para emitir tokens en tiempo real
+            import concurrent.futures
+            import queue as _queue
+
+            q = _queue.Queue()
+
+            def _producer():
+                try:
+                    for evt in ai_engine.generate_response_stream(request.message, request.user_id):
+                        q.put(evt)
+                        # Guardar en cache de sesion para replay
+                        session_cache.append_event(request.user_id, evt.copy())
+                except Exception as ex:
+                    q.put({"type": "token", "content": f"Error: {str(ex)}"})
+                finally:
+                    q.put(None)  # sentinel
+
+            import threading
+            t = threading.Thread(target=_producer, daemon=True)
+            t.start()
+
+            while True:
+                # Esperar evento del productor sin bloquear el event loop
+                try:
+                    evt = await loop.run_in_executor(None, lambda: q.get(timeout=60))
+                except Exception:
+                    break
+
+                if evt is None:
+                    break
+
+                yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+
+                if evt.get("type") == "done":
+                    break
+
+        except asyncio.CancelledError:
+            # El cliente se desconecto - el servidor sigue guardando en session_cache
+            pass
+        except Exception as ex:
+            logging.error(f"Error en /api/chat/stream: {traceback.format_exc()}")
+            yield f"data: {json.dumps({'type': 'token', 'content': str(ex)})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/api/session/replay/{user_id}")
+async def session_replay(user_id: str, since: float = 0.0):
+    """Retorna eventos de sesion ocurridos desde 'since' (timestamp UNIX).
+
+    Util para reconectar el navegador y reproducir eventos perdidos.
+    """
+    events = session_cache.get_events_since(user_id, since_ts=since)
+    return {"events": events, "count": len(events)}
+
+
 
 
 @app.get("/api/emotion")
 async def get_current_emotion():
     """Obtener la emoción actual de Lily"""
     emotional_state = ai_engine.get_emotional_state()
-    
+
     return {
         "emotion": emotional_state.emotion.value,
         "intensity": emotional_state.intensity,
@@ -141,7 +238,7 @@ async def get_user_memory(user_id: str):
         context = ai_engine.memory_system.get_conversation_context(user_id, max_messages=10)
         summary = ai_engine.memory_system.get_conversation_summary(user_id)
         emotional_summary = ai_engine.memory_system.get_emotional_summary(user_id)
-        
+
         return {
             "user_id": user_id,
             "conversation_summary": summary,
@@ -158,11 +255,21 @@ async def get_preferences(user_id: str):
         gmail_password = ai_engine.memory_system.get_preference(user_id, "gmail_password", "")
         has_password = len(gmail_password) > 0
         user_name = ai_engine.memory_system.get_preference(user_id, "user_name", "Mijin")
-        
+        gemini_api_key = ai_engine.memory_system.get_preference(user_id, "gemini_api_key", "")
+        has_gemini_key = len(gemini_api_key) > 0
+        gemini_key_preview = ""
+        if has_gemini_key:
+            if len(gemini_api_key) > 12:
+                gemini_key_preview = f"{gemini_api_key[:6]}...{gemini_api_key[-4:]}"
+            else:
+                gemini_key_preview = "****"
+
         return {
             "gmail_user": gmail_user,
             "has_password": has_password,
-            "user_name": user_name
+            "user_name": user_name,
+            "has_gemini_key": has_gemini_key,
+            "gemini_key_preview": gemini_key_preview
         }
 
 
@@ -176,10 +283,42 @@ async def save_preference(user_id: str, request: Request):
     try:
         data = await request.json()
         for key, val in data.items():
+            if key == "gemini_api_key" and isinstance(val, str):
+                val = val.strip()
             ai_engine.memory_system.update_preference(user_id, key, val)
         return {"status": "success", "message": "Preferencias actualizadas"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/gemini/test/{user_id}")
+def test_gemini_connection(user_id: str):
+    """Probar la conexión con Gemini usando la clave API guardada"""
+    try:
+        gemini = getattr(ai_engine, "gemini_client", None)
+        if gemini is None:
+            raise HTTPException(status_code=500, detail="Cliente de Gemini no disponible")
+
+        if not gemini.get_api_key(user_id):
+            raise HTTPException(
+                status_code=400,
+                detail="No hay clave API de Gemini configurada. Guarda tu clave primero.",
+            )
+
+        model = gemini.get_model(user_id)
+        reply = gemini.generate(
+            [{"role": "user", "content": "Responde únicamente con la palabra OK."}],
+            user_id,
+            model=model,
+        )
+        return {"status": "success", "model": model, "response": reply[:120]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        detail = str(e)
+        if len(detail) > 300:
+            detail = detail[:300] + "..."
+        raise HTTPException(status_code=400, detail=f"Error conectando con Gemini: {detail}")
 
 
 
@@ -189,7 +328,7 @@ async def text_to_speech(request: Request):
     data = await request.json()
     text = data.get("text", "")
     emotion = data.get("emotion", "neutral")
-    
+
     try:
         audio_url = tts_engine.text_to_speech(text, emotion)
         return {
@@ -210,10 +349,10 @@ async def transcribe_audio(file: UploadFile = File(...)):
         # Guardar archivo temporalmente
         with open(temp_filename, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-            
+
         # Transcribir
         text = stt_engine.transcribe(temp_filename)
-        
+
         return {"text": text, "engine": "whisper"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error transcribiendo audio: {str(e)}")
@@ -231,7 +370,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
 async def get_audio(filename: str):
     """Servir archivos de audio generados"""
     audio_path = os.path.join("static", "audio", filename)
-    
+
     if os.path.exists(audio_path):
         media_type = "audio/mpeg" if filename.endswith(".mp3") else "audio/wav"
         return FileResponse(audio_path, media_type=media_type)
@@ -374,9 +513,9 @@ async def upload_document(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
-        
+
         doc_ids = rag_engine.ingest_file(file_path, metadata={"uploaded_by": "web_interface"})
-        
+
         if doc_ids:
             return {
                 "success": True,
@@ -439,12 +578,12 @@ def query_knowledge(request: dict):
     try:
         query_text = request.get("query", "")
         n_results = request.get("n_results", 3)
-        
+
         if not query_text:
             raise HTTPException(status_code=400, detail="Query es requerido")
-        
+
         documents, metadatas = rag_engine.query(query_text, n_results=n_results)
-        
+
         return {
             "success": True,
             "results": [{"text": doc, "metadata": meta} for doc, meta in zip(documents, metadatas)],
@@ -463,7 +602,7 @@ def configure_rag(config: dict):
         if "chunk_size" in config:
             overlap = config.get("chunk_overlap", 50)
             rag_engine.set_chunk_size(config["chunk_size"], overlap=overlap)
-        
+
         return {
             "success": True,
             "message": "RAG configurado correctamente",
@@ -484,11 +623,11 @@ if __name__ == "__main__":
     print(f"Servidor iniciando en: http://127.0.0.1:8000")
     print(f"Documentación API: http://127.0.0.1:8000/docs")
     print("=" * 60)
-    
+
     # Limpiar archivos de audio antiguos al iniciar
     print("Limpiando archivos de audio antiguos...")
     tts_engine.clean_old_audio_files(max_age_seconds=300)
-    
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

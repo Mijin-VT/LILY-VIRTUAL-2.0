@@ -849,7 +849,8 @@ body.dark-theme .stat-value {
 }
 
 body.dark-theme #gmailUserInput,
-body.dark-theme #gmailPasswordInput {
+body.dark-theme #gmailPasswordInput,
+body.dark-theme #geminiApiKeyInput {
     background: #151522;
     border-color: #2d2d3f;
     color: #ffffff;
@@ -866,6 +867,35 @@ body.dark-theme .action-button.secondary {
 
 body.dark-theme .action-button.secondary:hover {
     background: #3d3d55;
+}
+
+/* Estado del botón "Probar" de la clave de Gemini */
+.action-button.test-ok,
+body.dark-theme .action-button.test-ok {
+    background: #22c55e;
+    color: #ffffff;
+}
+
+.action-button.test-ok:hover,
+body.dark-theme .action-button.test-ok:hover {
+    background: #16a34a;
+}
+
+.action-button.test-fail,
+body.dark-theme .action-button.test-fail {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.action-button.test-fail:hover,
+body.dark-theme .action-button.test-fail:hover {
+    background: #dc2626;
+}
+
+.action-button.test-ok:disabled,
+.action-button.test-fail:disabled {
+    opacity: 0.85;
+    color: #ffffff;
 }
 
 body.dark-theme .chat-container::-webkit-scrollbar-track,

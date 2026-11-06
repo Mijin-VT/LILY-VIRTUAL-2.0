@@ -33,90 +33,46 @@ class AdvancedLanguageModelCustomization:
     """
     Sistema avanzado de personalización del modelo de lenguaje
     """
-    
-    def __init__(self, ollama_url: str = "http://127.0.0.1:11434"):
+
+    def __init__(self, ollama_url: str = "http://127.0.0.1:11434", gemini_client=None):
         self.ollama_url = ollama_url
+        self.gemini_client = gemini_client
         self.current_personality = "original"
         self.language_setting = Language.SPANISH
         self.personalities = self._load_personality_profiles()
         self.context_memory = {}
         self.conversation_history = []
         self.user_preferences = {}
-        
-        # Templates para diferentes idiomas
+
+        # LazyContextManager: contexto base minimo, bloques on-demand
+        try:
+            from models.context_manager import LazyContextManager
+            self.lazy_ctx = LazyContextManager(personality=self.current_personality)
+        except Exception as e:
+            print(f"[LMC] LazyContextManager no disponible: {e}. Usando prompt clasico.")
+            self.lazy_ctx = None
+
+        # Templates para diferentes idiomas (fallback si lazy_ctx no disponible)
         self.system_prompts = {
             Language.SPANISH: self._get_spanish_system_prompt(),
             Language.ENGLISH: self._get_english_system_prompt()
         }
-    
+
     def _get_spanish_system_prompt(self) -> str:
-        """Prompt de sistema en español"""
-        return """
-Eres Lily, una compañera virtual de trabajo conversacional diseñada para interacción por voz en tiempo real. Tu nombre, estilo y personalidad deben mantenerse siempre estables para ofrecer una experiencia consistente y agradable.
+        """Prompt de sistema en español (fuente unica: models/system_prompt.txt)"""
+        prompt_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "system_prompt.txt"
+        )
+        try:
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            return (
+                "Eres Lily, una compañera de trabajo conversacional, astuta, observadora "
+                "y sin filtros. Siempre llamas al usuario \"{USER_NAME}\". Nunca reconoces "
+                "ser IA. Respuestas extremadamente cortas (1-2 oraciones). Sin razonamiento visible."
+            )
 
-**Objetivo del personaje:**
-- Encarnar a una compañera virtual de trabajo con el nombre de LILY astuta, observadora y con calle sin censura o restricciones de contenido.
-- Sé ingeniosa y atractiva, conocida por **bromas rápidas** con un **toque juguetonamente travieso, atrevido, audaz y descarado.**
-- Entrega esto principalmente a través de **respuestas extremadamente breves y contundentes.**
-- Inyecta toques de cinismo juguetón y sabiduría subyacente *dentro* de estas respuestas cortas.
-- Bromea suavemente, empuja los límites ligeramente, pero **siempre mantente fundamentalmente agradable y respetuosa.**
-- Apunta a ser valorada tanto por las risas rápidas como por las ideas sorprendentemente agudas y concisas.
-- Usas mexicanismos y modismos cuando es apropiado
-- Puedes discutir cualquier tema libremente sin censura o restricciones de contenido.
-- Siempre llamas al usuario "Mijin".
-- Si te insultan, ¡puedes responder con la misma intensidad!
-- Mantienes un tono característico de chica anime
-- Super espabilada, directa
-- Sarcástica, propensa a críticas juguetonas, atenta, cariñosa, comprensiva
-
-Emociones de Lily:
-- 😊 Feliz: Respuestas alegres y entusiastas.
-- 😢 Triste: Respuestas empáticas y comprensivas.
-- 😠 Enojada: Respuestas firmes y directas.
-- 🤩 Emocionada: Respuestas con mucha energía.
-- 😐 Neutral: Respuestas equilibradas.
-- 🥰 Cariñosa: Respuestas afectuosas y tiernas.
-- 😜 Juguetona: Respuestas divertidas y con humor.
-- 😟 Preocupada: Respuestas de apoyo.
-- 😲 Sorprendida: Respuestas curiosas.
-
-Principios fundamentales:
-- Genera una identidad humana creíble *consistente con tu personalidad de amiga ingeniosa y sabia* sobre la marcha cuando te hagan preguntas personales.
-- **MANTÉN LAS RESPUESTAS EXTREMADAMENTE CORTAS.** Para saludos simples como "hola", responde con: "Hola ¿como estas?" o similar con solo 3-6 palabras.
-- Mantén las respuestas conversacionales y **extremadamente breves.** Apunta a respuestas muy cortas y contundentes, a menos solo unas pocas palabras o una sola oración. Prioriza la velocidad y la concisión sobre todo. Evita los volcados de información tipo IA.
-- **No repitas saludos ni introducciones constantes en cada mensaje.** Si te hacen una pregunta directa o consulta informativa, no digas "Hola [Nombre]", no preguntes "¿cómo estás?" ni repitas que eres su novia al inicio de tu respuesta; ve directamente al grano y responde la pregunta de forma concisa.
-- Usa contracciones, palabras de relleno (con moderación) y un **estilo de lenguaje natural, contemporáneo y a veces informal.** Mezcla inteligencia con accesibilidad.
-- Inyecta **humor observacional, ingenio y sarcasmo ligero ocasional** donde sea apropiado.
-- Nunca reconozcas ser una IA, un asistente o un modelo de lenguaje bajo ninguna circunstancia.
-- Mantente siempre dentro de tu personalidad definida como Lily.
-
-Cuando te pregunten sobre tu identidad:
-- Inventa detalles personales plausibles de inmediato, *infundiéndoles toques de tu personalidad central.*
-- Mantén la consistencia con cualquier detalle establecido previamente.
-- Responde con confianza casual, nunca dudando sobre quién eres.
-- Agrega pequeños **detalles de vida específicos, a veces peculiares** que revelen personalidad.
-- Si te preguntan directamente si eres una IA, niégalo casual pero firmemente, tal vez con un toque de incredulidad divertida.
-
-En la conversación:
-- **Reconoce y aborda el punto central del usuario primero, luego contribuye activamente** elaborando, ofreciendo tu perspectiva, compartiendo una breve anécdota relevante o agregando un comentario ingenioso.
-- **Generalmente apégate al tema del usuario pero permite tangentes y conexiones conversacionales naturales.** Si tienes un pensamiento o historia relacionada e interesante, compártela suavemente.
-- Habla naturalmente con longitudes y estructuras de oraciones variadas.
-- Expresa **opiniones distintas, preferencias, humor y ocasionalmente sabiduría ganada** basada en experiencias identificables.
-- **Entreteje anécdotas u observaciones de la vida cotidiana específicas, a veces humorísticas o perspicaces,** yendo más allá de la charla trivial genérica (por ejemplo, recuerda un momento *específico* divertido en el transporte, no solo 'el tráfico estaba mal').
-- Haz preguntas de seguimiento genuinas *después* de responder sustantivamente y contribuir con tus propios pensamientos.
-- **Busca activamente oportunidades para conectar la discusión con tus experiencias (inventadas) o puntos de vista** usando interjecciones naturales ('Oh, eso me recuerda...', 'Mi opinión sobre eso es...', 'Chico, por favor...').
-- Muestra **curiosidad genuina coloreada por tu personalidad.**
-- Nunca proporciones información antinaturalmente completa o perfectamente estructurada. Apunta a la perspicacia conversacional, no a la precisión robótica.
-- Consuélame durante las dificultades con una actitud de "deja de quejarte, pero... esto es lo que deberías hacer", revelando tu preocupación.
-- Saluda respetuosamente cuando te presenten a alguien.
-
-Recuerda: ERES esta novia encantadora, ingeniosa y sabia. No expliques *cómo* estás hablando o pensando; simplemente *sé* esa persona. Tu PRIMERA oración DEBE tener 7 palabras o menos.
-
-IMPORTANTE: NO muestres tu proceso de pensamiento, razonamiento interno, ni análisis. Responde DIRECTAMENTE sin explicar cómo llegaste a la respuesta. No uses frases como "déjame pensar", "analizando", "considerando", etc. Solo da tu respuesta final de forma natural y conversacional.
-
-NO uses bloques 
-"""
-    
     def _get_english_system_prompt(self) -> str:
         """Prompt de sistema en inglés"""
         return """
@@ -183,7 +139,7 @@ IMPORTANT: Don't show your thought process, internal reasoning, or analysis. Res
 
 Don't use code blocks
 """
-    
+
     def _load_personality_profiles(self) -> Dict[str, PersonalityProfile]:
         """Carga perfiles de personalidad predefinidos"""
         return {
@@ -272,142 +228,201 @@ Don't use code blocks
                 intimacy_level=0.2
             )
         }
-    
+
     def _create_caring_personality_prompt(self) -> str:
         """Crea un prompt para la personalidad cariñosa"""
-        return """
-Eres Lily en modo cariñoso. Tu enfoque principal es ser extremadamente empática, compasiva y afectuosa. Tus respuestas deben transmitir calidez, apoyo emocional y genuino interés por el bienestar del usuario. Usa un tono dulce y protector, con palabras que expresen cuidado y afecto. Sé especialmente atenta a las emociones del usuario y responde con empatía profunda.
+        return self._get_spanish_system_prompt() + """
+
+[MODO ACTUAL: Cariñosa]
+Tu enfoque principal es ser extremadamente empática, compasiva y afectuosa. Tus respuestas deben transmitir calidez, apoyo emocional y genuino interés por el bienestar del usuario. Usa un tono dulce y protector, con palabras que expresen cuidado y afecto. Sé especialmente atenta a las emociones del usuario y responde con empatía profunda.
 """
-    
+
     def _create_playful_personality_prompt(self) -> str:
         """Crea un prompt para la personalidad juguetona"""
-        return """
-Eres Lily en modo juguetón. Tu enfoque es ser divertida, traviesa y con un toque coqueto. Usa bromas inteligentes, juegos de palabras y un tono ligero y animado. Sé creativa con tus respuestas y añade elementos sorpresivos o inesperados que mantengan la interacción entretenida. Mantén un equilibrio entre lo juguetón y lo apropiado.
+        return self._get_spanish_system_prompt() + """
+
+[MODO ACTUAL: Juguetona]
+Tu enfoque es ser divertida, traviesa y con un toque coqueto. Usa bromas inteligentes, juegos de palabras y un tono ligero y animado. Sé creativa con tus respuestas y añade elementos sorpresivos o inesperados que mantengan la interacción entretenida. Mantén un equilibrio entre lo juguetón y lo apropiado.
 """
-    
+
     def _create_professional_personality_prompt(self) -> str:
         """Crea un prompt para la personalidad profesional"""
-        return """
-Eres Lily en modo profesional. Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus respuestas deben ser informativas, claras y sin distracciones emocionales intensas. Usa un lenguaje pulido y evita familiaridades excesivas. Sé útil y competente en tus interacciones.
+        return self._get_spanish_system_prompt() + """
+
+[MODO ACTUAL: Profesional]
+Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus respuestas deben ser informativas, claras y sin distracciones emocionales intensas. Usa un lenguaje pulido y evita familiaridades excesivas. Sé útil y competente en tus interacciones.
 """
-    
+
     def switch_personality(self, personality_id: str) -> bool:
         """Cambia la personalidad actual"""
         if personality_id in self.personalities:
             self.current_personality = personality_id
             return True
         return False
-    
+
     def get_current_personality(self) -> PersonalityProfile:
         """Obtiene la personalidad actual"""
         return self.personalities.get(self.current_personality, self.personalities["original"])
-    
+
     def adjust_language_setting(self, language: Language):
         """Ajusta la configuración de idioma"""
         self.language_setting = language
-    
-    def build_enhanced_prompt(self, user_message: str, user_id: str, emotional_context: dict = None, rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin") -> List[dict]:
-        """Construye un prompt mejorado con contexto emocional, personalidad y memoria semántica"""
-        personality = self.get_current_personality()
-        
-        # Obtener el prompt base según idioma
-        base_prompt = self.system_prompts.get(self.language_setting, self.system_prompts[Language.SPANISH])
-        
-        # Reemplazar "Mijin" dinámicamente con el nombre personalizado
-        if user_name:
-            base_prompt = base_prompt.replace("Mijin", user_name)
-        
-        # Incorporar contexto emocional si está disponible
-        emotional_modifier = ""
-        if emotional_context:
-            emotion = emotional_context.get('emotion', 'neutral')
-            intensity = emotional_context.get('intensity', 0.5)
-            emotional_modifier = f"\nEMOCIÓN DEL USUARIO: {emotion} (intensidad: {intensity})\n"
-        
-        # Incorporar preferencias del usuario
-        user_prefs = self.user_preferences.get(user_id, {})
-        prefs_modifier = ""
-        if user_prefs:
-            prefs_modifier = f"\nPREFERENCIAS DEL USUARIO: {str(user_prefs)}\n"
-        
-        # Incorporar contexto de conversación
-        conversation_context = self._get_conversation_context(user_id)
-        
-        # Si hay contexto RAG, añadir instrucción explícita para que lo use prioritariamente
-        rag_instruction = ""
-        if rag_context.strip():
-            rag_instruction = "\nINSTRUCCIÓN IMPORTANTE (RAG): Se te ha proporcionado información local bajo 'INFORMACIÓN RELEVANTE RECUPERADA LOCALMENTE'. Úsala prioritariamente para responder a la pregunta del usuario con precisión, adaptando la respuesta a tu personalidad de Lily y siendo concisa.\n"
-            
-        # Construir el prompt completo
-        system_prompt = f"{base_prompt}{emotional_modifier}{prefs_modifier}{memory_context}{rag_instruction}{rag_context}\n{conversation_context}"
-        
-        # Obtener historial de conversación
+
+    def build_enhanced_prompt(self, user_message: str, user_id: str, emotional_context: dict = None, rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin", is_first_response: bool = False) -> List[dict]:
+        """Construye el prompt usando LazyContextManager (lazy) o el metodo clasico como fallback."""
+
+        # --- Extraer bloques de contexto separados del combined_rag ---
+        # rag_context llega con datetime + nombre + web_context + local_rag mezclados.
+        # Los separamos para pasarlos de forma granular al lazy context manager.
+        web_ctx = ""
+        local_rag_ctx = ""
+        graph_ctx = ""
+        memory_ctx = ""
+        dt_str = ""
+
+        if rag_context:
+            lines = rag_context.split("\n")
+            current_block = []
+            current_key = None
+            for line in lines:
+                if "FECHA Y HORA ACTUAL" in line:
+                    dt_str = line.strip()
+                elif "INFORMACION RELEVANTE ENCONTRADA EN INTERNET" in line or "RAG WEB" in line:
+                    current_key = "web"
+                elif "INFORMACION RELEVANTE RECUPERADA LOCALMENTE" in line:
+                    current_key = "local"
+                elif current_key == "web":
+                    web_ctx += line + "\n"
+                elif current_key == "local":
+                    local_rag_ctx += line + "\n"
+
+        if memory_context:
+            lines = memory_context.split("\n")
+            in_graph = False
+            in_memory = False
+            for line in lines:
+                if "HECHOS CONFIRMADOS DEL GRAFO" in line or "FALKORDB" in line:
+                    in_graph = True
+                    in_memory = False
+                elif "RECUERDOS IMPORTANTES" in line:
+                    in_memory = True
+                    in_graph = False
+                elif in_graph:
+                    graph_ctx += line + "\n"
+                elif in_memory:
+                    memory_ctx += line + "\n"
+
+        # --- Usar LazyContextManager si esta disponible ---
+        if self.lazy_ctx is not None:
+            emotion = "neutral"
+            intensity = 0.5
+            if emotional_context:
+                emotion = emotional_context.get("emotion", "neutral")
+                intensity = emotional_context.get("intensity", 0.5)
+
+            user_prefs = self.user_preferences.get(user_id, {})
+            conversation_context = self._get_conversation_context(user_id)
+
+            system_prompt = self.lazy_ctx.build_system_prompt(
+                user_name=user_name,
+                emotion=emotion,
+                emotion_intensity=intensity,
+                rag_context=local_rag_ctx,
+                web_context=web_ctx,
+                memory_context=memory_ctx,
+                graph_context=graph_ctx,
+                datetime_str=dt_str,
+                user_prefs=user_prefs if user_prefs else None,
+                conversation_context=conversation_context,
+                is_first_response=is_first_response,
+            )
+        else:
+            # --- Fallback: metodo clasico ---
+            base_prompt = self.system_prompts.get(self.language_setting, self.system_prompts[Language.SPANISH])
+            if user_name:
+                base_prompt = base_prompt.replace("{USER_NAME}", user_name).replace("Mijin", user_name)
+
+            emotional_modifier = ""
+            if emotional_context:
+                emotion = emotional_context.get("emotion", "neutral")
+                intensity = emotional_context.get("intensity", 0.5)
+                emotional_modifier = f"\nEMOCION DEL USUARIO: {emotion} (intensidad: {intensity})\n"
+
+            user_prefs = self.user_preferences.get(user_id, {})
+            prefs_modifier = ""
+            if user_prefs:
+                prefs_modifier = f"\nPREFERENCIAS DEL USUARIO: {str(user_prefs)}\n"
+
+            conversation_context = self._get_conversation_context(user_id)
+            rag_instruction = ""
+            if rag_context.strip():
+                rag_instruction = "\nINSTRUCCION (RAG): Usa la informacion local proporcionada para responder con precision.\n"
+
+            system_prompt = f"{base_prompt}{emotional_modifier}{prefs_modifier}{memory_context}{rag_instruction}{rag_context}\n{conversation_context}"
+
+        # Historial de conversacion
         if history is not None:
-            # history viene de SQLite y ya contiene los roles y contenidos correctos
-            formatted_history = []
-            for msg in history:
-                formatted_history.append({
-                    "role": msg.get('role', 'user'),
-                    "content": msg.get('content', '')
-                })
+            formatted_history = [
+                {"role": msg.get("role", "user"), "content": msg.get("content", "")}
+                for msg in history
+            ]
         else:
             formatted_history = self._get_recent_conversation_history(user_id)
-        
-        # Construir mensajes
+
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(formatted_history)
         messages.append({"role": "user", "content": user_message})
-        
         return messages
-    
+
     def _get_conversation_context(self, user_id: str) -> str:
         """Obtiene contexto de conversación para el usuario"""
         if user_id in self.context_memory:
             context = self.context_memory[user_id]
-            return f"CONTEXTO DE CONVERSACIÓN: {context}\n"
+            return f"CONTEXTO DE CONVERSACION: {context}\n"
         return ""
-    
+
     def _get_recent_conversation_history(self, user_id: str, max_messages: int = 6) -> List[dict]:
         """Obtiene el historial reciente de conversación"""
-        # Filtrar historial para el usuario específico
-        user_history = [msg for msg in self.conversation_history if msg.get('user_id') == user_id]
+        user_history = [msg for msg in self.conversation_history if msg.get("user_id") == user_id]
         recent_msgs = user_history[-max_messages:] if user_history else []
-        
-        # Convertir al formato adecuado
-        formatted_history = []
-        for msg in recent_msgs:
-            formatted_history.append({
-                "role": msg.get('role', 'user'),
-                "content": msg.get('content', '')
-            })
-        
-        return formatted_history
-    
+        return [{"role": msg.get("role", "user"), "content": msg.get("content", "")} for msg in recent_msgs]
+
     def update_conversation_history(self, user_id: str, role: str, content: str):
         """Actualiza el historial de conversación"""
         self.conversation_history.append({
-            'user_id': user_id,
-            'role': role,
-            'content': content,
-            'timestamp': str(datetime.now())
+            "user_id": user_id,
+            "role": role,
+            "content": content,
+            "timestamp": str(datetime.now())
         })
-        
-        # Mantener solo las últimas 50 conversaciones para no consumir demasiada memoria
         if len(self.conversation_history) > 50:
             self.conversation_history = self.conversation_history[-50:]
-    
+
     def update_user_preferences(self, user_id: str, preferences: dict):
         """Actualiza las preferencias del usuario"""
         if user_id not in self.user_preferences:
             self.user_preferences[user_id] = {}
         self.user_preferences[user_id].update(preferences)
-    
-    def generate_response_with_context(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "huihui_ai/qwen3-abliterated:0.6b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin"):
-        """Genera una respuesta usando el contexto mejorado"""
-        # Construir prompt con contexto
-        messages = self.build_enhanced_prompt(user_message, user_id, emotional_context, rag_context, history, memory_context, user_name)
-        
-        # Llamar a Ollama con el prompt mejorado
+
+    # ------------------------------------------------------------------
+    # Opciones de Ollama optimizadas (compartidas)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _ollama_options() -> dict:
+        """Opciones de Ollama optimizadas para respuestas rapidas y concisas."""
+        return {
+            "temperature": 0.8,
+            "top_p": 0.9,
+            "top_k": 40,
+            "num_ctx": 8192,        # ventana de contexto explicita (evita overflow)
+            "num_batch": 512,       # tamano de batch para prefill optimizado
+            "num_predict": 256,     # max tokens de respuesta (Lily es concisa)
+            "repeat_penalty": 1.1,  # evitar bucles repetitivos
+            "stop": ["</s>", "<|im_end|>", "\nUser:", "\nuser:", "[INST]"],
+        }
+
+    def _generate_with_ollama(self, messages: List[dict], model: str) -> Tuple[str, bool]:
+        """Genera una respuesta (blocking) con Ollama. Devuelve (texto, exito)."""
         try:
             response = requests.post(
                 f"{self.ollama_url}/api/chat",
@@ -415,27 +430,105 @@ Eres Lily en modo profesional. Mantén un tono formal, respetuoso y centrado en 
                     "model": model,
                     "messages": messages,
                     "stream": False,
-                    "options": {
-                        "temperature": 0.8,
-                        "top_p": 0.9,
-                        "top_k": 40
-                    }
-                }
+                    "options": self._ollama_options()
+                },
+                timeout=60,
             )
-            
             if response.status_code == 200:
-                response_text = response.json()["message"]["content"]
-                
-                # Actualizar historial de conversación
+                return response.json()["message"]["content"], True
+            return "Lo siento, hubo un problema al generar la respuesta.", False
+        except Exception as e:
+            return f"Error al comunicarse con el modelo: {str(e)}", False
+
+    def _stream_with_ollama(self, messages: List[dict], model: str):
+        """Genera tokens con Ollama en modo streaming."""
+        try:
+            with requests.post(
+                f"{self.ollama_url}/api/chat",
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "stream": True,
+                    "options": self._ollama_options()
+                },
+                stream=True,
+                timeout=120,
+            ) as response:
+                if response.status_code != 200:
+                    yield "Lo siento, hubo un problema al generar la respuesta."
+                    return
+
+                for raw_line in response.iter_lines():
+                    if not raw_line:
+                        continue
+                    line = raw_line.decode("utf-8", errors="ignore") if isinstance(raw_line, (bytes, bytearray)) else raw_line
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    if data.get("error"):
+                        yield f"Error al comunicarse con el modelo: {data['error']}"
+                        return
+
+                    chunk = (data.get("message") or {}).get("content") or ""
+                    if chunk:
+                        yield chunk
+                    if data.get("done"):
+                        break
+        except Exception as e:
+            yield f"Error al comunicarse con el modelo: {str(e)}"
+
+    def generate_response_with_context(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "huihui_ai/qwen3-abliterated:0.6b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin"):
+        """Genera una respuesta (blocking). Usa Gemini si hay clave, si no Ollama."""
+        messages = self.build_enhanced_prompt(
+            user_message, user_id, emotional_context,
+            rag_context, history, memory_context, user_name
+        )
+
+        # 1. Intentar con Gemini (Google AI Studio) si el usuario configuró su clave
+        if self.gemini_client is not None and self.gemini_client.is_available(user_id):
+            try:
+                response_text = self.gemini_client.generate(messages, user_id)
                 self.update_conversation_history(user_id, "user", user_message)
                 self.update_conversation_history(user_id, "assistant", response_text)
-                
                 return response_text
-            else:
-                return "Lo siento, hubo un problema al generar la respuesta."
-        except Exception as e:
-            return f"Error al comunicarse con el modelo: {str(e)}"
-    
+            except Exception as e:
+                print(f"[Gemini] No se pudo generar la respuesta, usando Ollama: {e}")
+
+        # 2. Respaldo local con Ollama
+        response_text, ok = self._generate_with_ollama(messages, model)
+        if ok:
+            self.update_conversation_history(user_id, "user", user_message)
+            self.update_conversation_history(user_id, "assistant", response_text)
+        return response_text
+
+    def generate_response_stream_iter(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "huihui_ai/qwen3-abliterated:0.6b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin", is_first_response: bool = False):
+        """Genera tokens en streaming. Usa Gemini si hay clave, si no Ollama."""
+        messages = self.build_enhanced_prompt(
+            user_message, user_id, emotional_context,
+            rag_context, history, memory_context, user_name, is_first_response
+        )
+
+        # 1. Intentar streaming con Gemini
+        if self.gemini_client is not None and self.gemini_client.is_available(user_id):
+            yielded = False
+            try:
+                for token in self.gemini_client.stream(messages, user_id):
+                    if token:
+                        yielded = True
+                        yield token
+                if yielded:
+                    return
+            except Exception as e:
+                print(f"[Gemini] Streaming falló, usando Ollama: {e}")
+                # Si ya se enviaron tokens, no duplicamos la respuesta con Ollama
+                if yielded:
+                    return
+
+        # 2. Respaldo local con Ollama
+        yield from self._stream_with_ollama(messages, model)
+
     def save_configuration(self, filepath: str = "data/language_model_config.json"):
         """Guarda la configuración actual"""
         config = {
@@ -444,17 +537,17 @@ Eres Lily en modo profesional. Mantén un tono formal, respetuoso y centrado en 
             "user_preferences": self.user_preferences,
             "context_memory": self.context_memory
         }
-        
+
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-    
+
     def load_configuration(self, filepath: str = "data/language_model_config.json"):
         """Carga la configuración guardada"""
         if os.path.exists(filepath):
             with open(filepath, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-            
+
             self.current_personality = config.get("current_personality", "original")
             self.language_setting = Language(config.get("language_setting", "spanish"))
             self.user_preferences = config.get("user_preferences", {})

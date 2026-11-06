@@ -4,7 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🌸 Lily virtual companion AI 🌸</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=3.1">
+    <link rel="stylesheet" href="/static/css/style.css?v=3.2">
+    <style>
+        /* Burbuja de streaming: cursor parpadeante mientras llegan tokens */
+        .message.streaming .stream-text::after {
+            content: '▋';
+            display: inline-block;
+            animation: blink 0.7s step-end infinite;
+            color: var(--primary-color, #ff6b9d);
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0; }
+        }
+        /* Streaming: sin borde inferior hasta finalizar */
+        .message.streaming .message-content {
+            border-bottom: 2px solid var(--primary-color, #ff6b9d);
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -138,7 +156,32 @@
                 </div>
                 <div id="gmailConfigStatus" class="status-msg"></div>
             </div>
-            
+
+            <div class="settings-section">
+                <h3>🔑 Clave API de Gemini (Google AI Studio)</h3>
+                <p class="section-desc">
+                    Pega aquí tu clave de API de Google AI Studio (puede empezar por <code>AIza</code> o <code>AQ.</code>) para que Lily use los modelos de Gemini.
+                    Si no hay clave o Gemini falla, Lily seguirá respondiendo con Ollama.
+                    Puedes crear tu clave gratis en
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color: #ff4fa3;">aistudio.google.com/app/apikey</a>.
+                </p>
+                <div class="gemini-form" style="display: flex; flex-direction: column; gap: 10px; max-width: 400px;">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label for="geminiApiKeyInput" style="font-size: 12px; font-weight: bold; color: #555;">Clave API:</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy... o AQ.Ab8..." autocomplete="off" spellcheck="false" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 13px; flex: 1;">
+                            <button id="toggleGeminiKeyBtn" type="button" class="action-button secondary" title="Mostrar u ocultar la clave" style="padding: 8px 10px; font-size: 13px;">👁️</button>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="saveGeminiKeyBtn" class="action-button primary" style="padding: 8px 15px; font-size: 13px;">Guardar Clave</button>
+                        <button id="testGeminiKeyBtn" class="action-button secondary" style="padding: 8px 15px; font-size: 13px;">Probar</button>
+                        <button id="deleteGeminiKeyBtn" class="action-button secondary" style="padding: 8px 15px; font-size: 13px;">Eliminar Clave</button>
+                    </div>
+                </div>
+                <div id="geminiKeyStatus" class="status-msg"></div>
+            </div>
+
             <div class="settings-section">
                 <h3>📚 Documentos Indexados</h3>
                 <div id="ragDocumentsList" class="doc-list">
@@ -236,6 +279,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=3.1"></script>
+    <script src="/static/js/app.js?v=3.4"></script>
 </body>
 </html>
