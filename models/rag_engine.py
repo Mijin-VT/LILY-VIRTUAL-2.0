@@ -33,14 +33,14 @@ class RAGEngine:
             name="lily_knowledge",
             embedding_function=self.embedding_fn
         )
-
+        
         # Umbral de similitud mínimo para resultados relevantes
         self.similarity_threshold = 0.085
-
+        
         # Tamaño de chunks y solapamiento
         self.chunk_size = 500
         self.chunk_overlap = 50
-
+        
         print(f"RAG Engine inicializado. Colección 'lily_knowledge' con {self.collection.count()} documentos.")
 
     def _split_text_into_chunks(self, text: str, chunk_size: int = None, overlap: int = None) -> List[str]:
@@ -54,12 +54,12 @@ class RAGEngine:
         paragraphs = text.split('\n\n')
         chunks = []
         current_chunk = ""
-
+        
         for para in paragraphs:
             para = para.strip()
             if not para:
                 continue
-
+                
             # Si el párrafo cabe en el chunk actual
             if len(current_chunk) + len(para) <= chunk_size:
                 current_chunk += "\n\n" + para if current_chunk else para
@@ -67,13 +67,13 @@ class RAGEngine:
                 # Guardar chunk actual si existe
                 if current_chunk:
                     chunks.append(current_chunk.strip())
-
+                
                 # Si el párrafo es más grande que chunk_size, dividirlo
                 if len(para) > chunk_size:
                     # Dividir por oraciones
                     sentences = re.split(r'(?<=[.!?]) +', para)
                     current_chunk = ""
-
+                    
                     for sentence in sentences:
                         if len(current_chunk) + len(sentence) <= chunk_size:
                             current_chunk += " " + sentence if current_chunk else sentence
@@ -89,18 +89,18 @@ class RAGEngine:
                                 current_chunk = sentence
                 else:
                     current_chunk = para
-
+        
         # Agregar último chunk
         if current_chunk:
             chunks.append(current_chunk.strip())
-
+        
         # Si no hay chunks, crear uno con todo el texto
         if not chunks and text.strip():
             chunks.append(text.strip())
-
+        
         return chunks
 
-    def add_document(self, text: str, metadata: Dict = None, doc_id: str = None,
+    def add_document(self, text: str, metadata: Dict = None, doc_id: str = None, 
                      chunk: bool = True, source: str = "manual") -> List[str]:
         """Agrega un documento a la base de datos vectorial con chunking opcional"""
         if doc_id is None:
@@ -121,21 +121,21 @@ class RAGEngine:
         if chunk and len(text) > self.chunk_size:
             chunks = self._split_text_into_chunks(text)
             doc_ids = []
-
+            
             for i, chunk_text in enumerate(chunks):
                 chunk_id = f"{doc_id}_chunk_{i}"
                 chunk_metadata = metadata.copy()
                 chunk_metadata["chunk_index"] = i
                 chunk_metadata["total_chunks"] = len(chunks)
                 chunk_metadata["doc_id"] = doc_id
-
+                
                 self.collection.add(
                     documents=[chunk_text],
                     metadatas=[chunk_metadata],
                     ids=[chunk_id]
                 )
                 doc_ids.append(chunk_id)
-
+            
             print(f"Documento '{doc_id}' agregado: {len(chunks)} chunks creados")
             return doc_ids
         else:
@@ -152,9 +152,9 @@ class RAGEngine:
         """Agrega un turno de conversación (Q&A) al contexto"""
         text = f"User: {user_text}\nLily: {assistant_text}"
         self.add_document(
-            text,
+            text, 
             metadata={
-                "type": "conversation",
+                "type": "conversation", 
                 "timestamp": datetime.now().isoformat(),
                 "user": user_text[:100]  # Primeros 100 chars como referencia
             },
@@ -169,7 +169,7 @@ class RAGEngine:
         """
         if min_similarity is None:
             min_similarity = self.similarity_threshold
-
+            
         try:
             results = self.collection.query(
                 query_texts=[query_text],
@@ -180,10 +180,10 @@ class RAGEngine:
             if results and results['documents']:
                 documents = []
                 metadatas = []
-
+                
                 # Filtrar por umbral de similitud
                 for i, (doc, meta, distance) in enumerate(zip(
-                    results['documents'][0],
+                    results['documents'][0], 
                     results['metadatas'][0],
                     results['distances'][0]
                 )):
@@ -194,7 +194,7 @@ class RAGEngine:
                     # ChromaDB devuelve distancia (menor = más similar)
                     # Convertir a similitud aproximada
                     similarity = 1.0 / (1.0 + distance)
-
+                    
                     # Para distancia L2 y embeddings no normalizados, la distancia es grande.
                     # Filtramos usando el umbral calibrado (0.085) para permitir fallback a internet en consultas irrelevantes
                     if similarity >= min_similarity:
@@ -203,13 +203,13 @@ class RAGEngine:
                         meta_with_similarity["similarity"] = round(similarity, 3)
                         meta_with_similarity["relevance_rank"] = len(documents)
                         metadatas.append(meta_with_similarity)
-
+                        
                         if len(documents) >= n_results:
                             break
-
+                
                 print(f"RAG: {len(documents)} documentos relevantes encontrados (de {len(results['documents'][0])} candidatos)")
                 return documents, metadatas
-
+            
             return [], []
         except Exception as e:
             print(f"Error en consulta RAG: {e}")
@@ -226,13 +226,13 @@ class RAGEngine:
         # Detectar tipo de archivo
         ext = os.path.splitext(file_path)[1].lower()
         filename = os.path.basename(file_path)
-
+        
         if doc_id is None:
             doc_id = f"{os.path.splitext(filename)[0]}_{uuid.uuid4().hex[:8]}"
 
         if metadata is None:
             metadata = {}
-
+        
         # Agregar metadatos del archivo
         metadata["filename"] = filename
         metadata["file_path"] = file_path
@@ -243,11 +243,11 @@ class RAGEngine:
 
         try:
             text = ""
-
+            
             if ext == '.txt' or ext == '.md':
                 with open(file_path, 'r', encoding='utf-8') as f:
                     text = f.read()
-
+                    
             elif ext == '.pdf':
                 # Intentar con PyPDF2 primero, luego con pdfplumber
                 try:
@@ -264,7 +264,7 @@ class RAGEngine:
                         print("ADVERTENCIA: Para leer PDF necesitas instalar PyPDF2 o pdfplumber:")
                         print("  pip install PyPDF2")
                         return []
-
+            
             elif ext == '.docx':
                 try:
                     from docx import Document
@@ -295,7 +295,7 @@ class RAGEngine:
         """Ingesta todos los archivos soportados en un directorio"""
         if dir_path is None:
             dir_path = self.knowledge_dir
-
+        
         if not os.path.exists(dir_path):
             print(f"Creando directorio de conocimiento: {dir_path}")
             os.makedirs(dir_path, exist_ok=True)
@@ -306,14 +306,14 @@ class RAGEngine:
         total_docs_before = self.collection.count()
 
         print(f"\nEscaneando directorio: {dir_path}")
-
+        
         # Recorrer directorio
         if recursive:
             for root, dirs, files in os.walk(dir_path):
                 for file in files:
                     file_path = os.path.join(root, file)
                     ext = os.path.splitext(file)[1].lower()
-
+                    
                     if ext in supported_extensions:
                         self.ingest_file(file_path)
                         files_ingested += 1
@@ -329,7 +329,7 @@ class RAGEngine:
         total_docs_after = self.collection.count()
         print(f"\nIngestión completada: {files_ingested} archivos procesados")
         print(f"Documentos en base de conocimiento: {total_docs_before} -> {total_docs_after}")
-
+        
         return files_ingested
 
     def delete_document(self, doc_id: str) -> bool:
@@ -340,7 +340,7 @@ class RAGEngine:
                 where={"doc_id": doc_id},
                 include=['metadatas']
             )
-
+            
             if results and results['ids']:
                 # Eliminar todos los chunks
                 self.collection.delete(ids=results['ids'])
@@ -359,13 +359,13 @@ class RAGEngine:
         try:
             # Obtener todos los metadatos
             count = self.collection.count()
-
+            
             # Obtener muestra de metadatos para análisis
             sample = self.collection.get(limit=min(count, 5000), include=['metadatas'])
-
+            
             non_conversation_chunks = 0
             unique_docs = set()
-
+            
             stats = {
                 "total_documents": 0,
                 "total_chunks": 0,
@@ -374,43 +374,43 @@ class RAGEngine:
                 "by_file_type": {},
                 "last_update": None
             }
-
+            
             if sample and sample.get('metadatas'):
                 for doc_id, meta in zip(sample['ids'], sample['metadatas']):
                     if not meta:
                         continue
-
+                    
                     # Excluir conversaciones de las estadísticas del RAG
                     doc_type = meta.get('type', 'unknown')
                     source = meta.get('source', 'unknown')
                     if doc_type == 'conversation' or source == 'conversation':
                         continue
-
+                        
                     non_conversation_chunks += 1
-
+                    
                     # Identificar documento único
                     unique_doc_id = meta.get('doc_id') or source or doc_id.split('_chunk_')[0]
                     unique_docs.add(unique_doc_id)
-
+                    
                     # Contar por tipo
                     stats["by_type"][doc_type] = stats["by_type"].get(doc_type, 0) + 1
-
+                    
                     # Contar por fuente
                     stats["by_source"][source] = stats["by_source"].get(source, 0) + 1
-
+                    
                     # Contar por tipo de archivo
                     file_type = meta.get('file_type', 'N/A')
                     stats["by_file_type"][file_type] = stats["by_file_type"].get(file_type, 0) + 1
-
+                    
                     # Última actualización
                     timestamp = meta.get('timestamp') or meta.get('ingested_at')
                     if timestamp and (stats["last_update"] is None or timestamp > stats["last_update"]):
                         stats["last_update"] = timestamp
-
+            
             stats["total_documents"] = len(unique_docs)
             stats["total_chunks"] = non_conversation_chunks
             return stats
-
+            
         except Exception as e:
             print(f"Error obteniendo estadísticas: {e}")
             return {"total_documents": 0, "total_chunks": 0, "error": str(e)}
@@ -423,40 +423,40 @@ class RAGEngine:
                 limit=1000,
                 include=['metadatas']
             )
-
+            
             documents = []
             seen_doc_ids = set()
-
+            
             if results and results.get('metadatas'):
                 for i, (doc_id, meta) in enumerate(zip(results['ids'], results['metadatas'])):
                     meta_dict = meta or {}
-
+                    
                     # Filtrar memorias de conversación
                     if meta_dict.get("type") == "conversation" or meta_dict.get("source") == "conversation":
                         continue
-
+                        
                     doc_base_id = meta_dict.get("doc_id") or doc_id.split('_chunk_')[0]
                     filename = meta_dict.get("filename") or meta_dict.get("source") or doc_base_id
-
+                    
                     if doc_base_id in seen_doc_ids:
                         continue
-
+                        
                     seen_doc_ids.add(doc_base_id)
-
+                    
                     # Copiar metadatos y asegurar el conteo de chunks
                     meta_copy = meta_dict.copy()
                     meta_copy["chunks"] = meta_copy.get("total_chunks", 1)
                     meta_copy["source"] = filename
-
+                    
                     doc_info = {
                         "id": doc_base_id,
                         "metadata": meta_copy
                     }
                     documents.append(doc_info)
-
+                    
                     if len(documents) >= limit:
                         break
-
+                        
             return documents
         except Exception as e:
             print(f"Error listando documentos: {e}")

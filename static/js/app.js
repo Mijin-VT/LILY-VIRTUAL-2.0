@@ -6,6 +6,8 @@ const state = {
     isTyping: false,
     isVoiceModeActive: false, // Modo de conversación por voz continua
     currentAudio: null, // Referencia al audio actualmente en reproducción
+    audioQueue: [], // Cola de audios TTS pendientes
+    pendingVoiceRestart: false, // Reiniciar escucha al terminar el procesamiento
     theme: 'light' // Tema actual ('light' o 'dark')
 };
 
@@ -62,6 +64,12 @@ let recognition = null;
 let wakeWordRecognition = null;
 let isRecording = false;
 let isListeningForWakeWord = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let currentStream = null;
+let discardRecording = false;
+let captureGeneration = 0;
+let isStopping = false;
 
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -73,9 +81,6 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     // recognition.interimResults = false;
 
     // recognition.onresult = (event) => { ... }
-
-    let mediaRecorder = null;
-    let audioChunks = [];
 
     // Event listeners para SpeechRecognition principal eliminados
     // Ahora se usa MediaRecorder + Backend
@@ -358,6 +363,20 @@ async function sendMessage() {
         return;
     }
 
+    // Si el modo manos libres está activo, pausar la escucha mientras Lily responde.
+    // Así evitamos que el micrófono capture la respuesta de Lily o mensajes a medias.
+    if (state.isVoiceModeActive) {
+        state.pendingVoiceRestart = true;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            discardRecording = true;
+            isStopping = true;
+            mediaRecorder.stop();
+        }
+        isRecording = false;
+        stopCurrentStream();
+        cleanupAudioAnalyser();
+    }
+
     // Limpiar input
     elements.messageInput.value = '';
     elements.charCount.textContent = '0';
@@ -428,9 +447,11 @@ async function sendMessage() {
                 } else if (evt.type === 'emotion') {
                     updateEmotionDisplay(evt.value);
 
-                } else if (evt.type === 'audio' && !audioPlayed) {
+                } else if (evt.type === 'audio') {
+                    // El backend puede enviar varios audios (primera oración + resto).
+                    // El primero reemplaza la cola; los siguientes se encolan.
+                    playAudio(evt.url, audioPlayed);
                     audioPlayed = true;
-                    playAudio(evt.url);
 
                 } else if (evt.type === 'done') {
                     // Finalizar burbuja con hora
@@ -451,7 +472,7 @@ async function sendMessage() {
                 });
                 if (ttsResp.ok) {
                     const ttsData = await ttsResp.json();
-                    if (ttsData.audio_url) playAudio(ttsData.audio_url);
+                    if (ttsData.audio_url) playAudio(ttsData.audio_url, false);
                 }
             } catch (_) {}
         }
@@ -470,7 +491,7 @@ async function sendMessage() {
             hideTypingIndicator();
             addMessage('assistant', data.response, data.emotion);
             updateEmotionDisplay(data.emotion);
-            if (data.audio_url) playAudio(data.audio_url);
+            if (data.audio_url) playAudio(data.audio_url, false);
         } catch (fallbackErr) {
             console.error('Error en fallback:', fallbackErr);
             hideTypingIndicator();
@@ -480,6 +501,13 @@ async function sendMessage() {
         state.isTyping = false;
         elements.sendButton.disabled = false;
         elements.messageInput.focus();
+
+        if (state.isVoiceModeActive) {
+            if (state.pendingVoiceRestart || (!state.currentAudio && state.audioQueue.length === 0)) {
+                state.pendingVoiceRestart = false;
+                restartVoiceIfIdle();
+            }
+        }
     }
 }
 
@@ -674,55 +702,87 @@ window.addEventListener('error', (e) => {
 });
 
 // Reproducir audio y eliminarlo después
-function playAudio(audioUrl) {
-    try {
-        // Si hay un audio reproduciéndose actualmente, detenerlo
+function playAudio(audioUrl, append = false) {
+    if (!audioUrl) return;
+
+    // Si es una respuesta nueva, detener el audio anterior y limpiar la cola.
+    if (!append) {
         if (state.currentAudio) {
             state.currentAudio.pause();
             state.currentAudio = null;
         }
+        state.audioQueue.forEach(url => deleteAudioFile(url));
+        state.audioQueue = [];
+    }
 
+    state.audioQueue.push(audioUrl);
+    if (!state.currentAudio) {
+        playNextAudio();
+    }
+}
+
+// Reproducir el siguiente audio de la cola
+function playNextAudio() {
+    if (state.currentAudio) return;
+
+    const audioUrl = state.audioQueue.shift();
+    if (!audioUrl) {
+        restartVoiceIfIdle();
+        return;
+    }
+
+    try {
         const audio = new Audio(audioUrl);
         state.currentAudio = audio;
         audio.volume = 0.8;
 
-        // Eliminar el audio después de que termine de reproducirse
-        audio.addEventListener('ended', () => {
-            state.currentAudio = null;
-            deleteAudioFile(audioUrl);
-            
-            // Si el modo de conversación continua está activo, iniciar captura automáticamente
-            if (state.isVoiceModeActive) {
-                console.log("Audio finalizado, reactivando captura de voz...");
-                startVoiceCapture();
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            if (state.currentAudio === audio) {
+                state.currentAudio = null;
             }
-        });
+            deleteAudioFile(audioUrl);
+            playNextAudio();
+        };
+
+        // Eliminar el audio después de que termine de reproducirse
+        audio.addEventListener('ended', finish);
 
         // También eliminar si hay error
         audio.addEventListener('error', () => {
             console.error('Error reproduciendo audio');
-            state.currentAudio = null;
-            deleteAudioFile(audioUrl);
-            
-            // Intentar reactivar captura en caso de error
-            if (state.isVoiceModeActive) {
-                startVoiceCapture();
-            }
+            finish();
         });
 
         audio.play().catch(error => {
             console.error('Error reproduciendo audio:', error);
-            state.currentAudio = null;
-            deleteAudioFile(audioUrl);
-            
-            // Intentar reactivar captura
-            if (state.isVoiceModeActive) {
-                startVoiceCapture();
-            }
+            finish();
         });
     } catch (error) {
         console.error('Error creando audio:', error);
+        state.currentAudio = null;
+        deleteAudioFile(audioUrl);
+        playNextAudio();
     }
+}
+
+// Reiniciar la captura de voz cuando Lily termine de hablar y procesar
+function restartVoiceIfIdle() {
+    if (!state.isVoiceModeActive) return;
+
+    if (state.isTyping || state.currentAudio || state.audioQueue.length > 0) {
+        state.pendingVoiceRestart = true;
+        return;
+    }
+
+    state.pendingVoiceRestart = false;
+    setTimeout(() => {
+        if (state.isVoiceModeActive && !state.isTyping && !state.currentAudio && state.audioQueue.length === 0) {
+            startVoiceCapture();
+        }
+    }, 250);
 }
 
 // Eliminar archivo de audio del servidor
@@ -793,7 +853,12 @@ function startVoiceMode() {
         state.currentAudio.pause();
         state.currentAudio = null;
     }
-    
+
+    state.audioQueue.forEach(url => deleteAudioFile(url));
+    state.audioQueue = [];
+    state.pendingVoiceRestart = false;
+    stopCurrentStream();
+
     startVoiceCapture();
 }
 
@@ -805,16 +870,26 @@ function stopVoiceMode() {
     
     // Detener grabación si está en progreso
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        discardRecording = true;
+        isStopping = true;
         mediaRecorder.stop();
+    } else {
+        isStopping = false;
     }
     isRecording = false;
+    captureGeneration++;
     
     // Detener reproducción de voz actual
     if (state.currentAudio) {
         state.currentAudio.pause();
         state.currentAudio = null;
     }
-    
+
+    state.audioQueue.forEach(url => deleteAudioFile(url));
+    state.audioQueue = [];
+    state.pendingVoiceRestart = false;
+    stopCurrentStream();
+
     // Detener analizador
     cleanupAudioAnalyser();
     elements.messageInput.placeholder = `Escribe tu mensaje aquí, ${state.userName || "Mijin"}...`;
@@ -829,35 +904,73 @@ function stopVoiceMode() {
 
 // Capturar voz del micrófono
 function startVoiceCapture() {
-    if (!state.isVoiceModeActive) return;
-    
+    if (!state.isVoiceModeActive || isRecording) return;
+    if (isStopping) {
+        state.pendingVoiceRestart = true;
+        return;
+    }
+    if (state.isTyping) {
+        state.pendingVoiceRestart = true;
+        return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error("getUserMedia no está disponible en este navegador/contexto");
+        alert("No se puede acceder al micrófono. Usa HTTPS o localhost y un navegador compatible.");
+        state.isVoiceModeActive = false;
+        stopVoiceMode();
+        return;
+    }
+
     isRecording = true;
+    discardRecording = false;
+    const generation = ++captureGeneration;
     elements.micButton.classList.add('recording');
     elements.messageInput.placeholder = "Escuchando...";
-    
+
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
+            if (generation !== captureGeneration || !state.isVoiceModeActive || state.isTyping) {
+                stream.getTracks().forEach(track => track.stop());
+                if (generation === captureGeneration) {
+                    isRecording = false;
+                    if (state.isVoiceModeActive) {
+                        state.pendingVoiceRestart = true;
+                    }
+                }
+                return;
+            }
+
+            currentStream = stream;
             mediaRecorder = new MediaRecorder(stream);
             audioChunks = [];
+            const mimeType = mediaRecorder.mimeType || 'audio/webm';
 
             mediaRecorder.addEventListener("dataavailable", event => {
                 audioChunks.push(event.data);
             });
 
             mediaRecorder.addEventListener("stop", () => {
-                if (state.isVoiceModeActive && audioChunks.length > 0) {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    sendAudioToTranscribe(audioBlob);
-                }
+                const shouldTranscribe = state.isVoiceModeActive && audioChunks.length > 0 && !discardRecording;
+                const audioBlob = shouldTranscribe ? new Blob(audioChunks, { type: mimeType }) : null;
+                discardRecording = false;
                 cleanupAudioAnalyser();
+                isStopping = false;
+
+                if (audioBlob) {
+                    sendAudioToTranscribe(audioBlob);
+                } else if (state.isVoiceModeActive) {
+                    restartVoiceIfIdle();
+                }
             });
 
             mediaRecorder.start();
-            
+
             // Iniciar detección de silencio
-            startSilenceDetection(stream);
+            startSilenceDetection(stream, generation);
         })
         .catch(error => {
+            if (generation !== captureGeneration) return;
             console.error("Error al acceder al micrófono:", error);
             alert("No se pudo acceder al micrófono.");
             state.isVoiceModeActive = false;
@@ -871,33 +984,67 @@ let analyser = null;
 let microphone = null;
 let speakingStarted = false;
 
-function startSilenceDetection(stream) {
+function startSilenceDetection(stream, generation) {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().catch(error => {
+                console.warn("No se pudo reanudar el AudioContext:", error);
+            });
+        }
+
         analyser = audioContext.createAnalyser();
         microphone = audioContext.createMediaStreamSource(stream);
-        
+
         analyser.fftSize = 512;
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
-        
+
         microphone.connect(analyser);
-        
+
         const threshold = 12; // Umbral de volumen para detectar sonido
         const silenceDuration = 1800; // 1.8s de silencio continuo para detener
+        const noSpeechTimeout = 10000; // 10s sin voz para reiniciar la escucha
+        const maxRecordingDuration = 15000; // 15s máximo por intervención
+        const recordingStart = Date.now();
         let lastSoundTime = Date.now();
         speakingStarted = false;
-        
+
+        const stopCapture = (discard = false) => {
+            if (discard) discardRecording = true;
+            isRecording = false;
+            elements.micButton.classList.remove('recording');
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                isStopping = true;
+                mediaRecorder.stop();
+            } else {
+                isStopping = false;
+            }
+        };
+
         function checkAudio() {
-            if (!isRecording || !state.isVoiceModeActive) return;
-            
+            if (!isRecording || !state.isVoiceModeActive || generation !== captureGeneration) return;
+
+            const now = Date.now();
+            if (now - recordingStart > maxRecordingDuration) {
+                console.log("Duración máxima de grabación alcanzada, deteniendo captura...");
+                stopCapture(false);
+                return;
+            }
+
+            if (!speakingStarted && now - recordingStart > noSpeechTimeout) {
+                console.log("Sin voz detectada, reiniciando escucha...");
+                stopCapture(true);
+                return;
+            }
+
             analyser.getByteFrequencyData(dataArray);
             let values = 0;
             for (let i = 0; i < bufferLength; i++) {
                 values += dataArray[i];
             }
             const average = values / bufferLength;
-            
+
             if (average > threshold) {
                 lastSoundTime = Date.now();
                 if (!speakingStarted) {
@@ -908,21 +1055,36 @@ function startSilenceDetection(stream) {
             } else {
                 if (speakingStarted && (Date.now() - lastSoundTime > silenceDuration)) {
                     console.log("Silencio detectado, deteniendo captura de voz...");
-                    isRecording = false;
-                    elements.micButton.classList.remove('recording');
-                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                        mediaRecorder.stop();
-                    }
+                    stopCapture(false);
                     return;
                 }
             }
-            
+
             requestAnimationFrame(checkAudio);
         }
-        
+
         requestAnimationFrame(checkAudio);
     } catch (e) {
         console.error("Error inicializando analizador de silencio:", e);
+        // Si el analizador falla, detener la grabación tras el límite máximo
+        setTimeout(() => {
+            if (isRecording && generation === captureGeneration) {
+                isRecording = false;
+                elements.micButton.classList.remove('recording');
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    isStopping = true;
+                    mediaRecorder.stop();
+                }
+            }
+        }, 15000);
+    }
+}
+
+// Detener las pistas del micrófono actual
+function stopCurrentStream() {
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
     }
 }
 
@@ -938,6 +1100,7 @@ function cleanupAudioAnalyser() {
             microphone.disconnect();
             microphone = null;
         }
+        stopCurrentStream();
     } catch (e) {
         console.error("Error limpiando analizador de audio:", e);
     }
@@ -947,8 +1110,13 @@ function cleanupAudioAnalyser() {
 async function sendAudioToTranscribe(audioBlob) {
     elements.messageInput.placeholder = "Escuchando y transcribiendo...";
 
+    const mime = audioBlob.type || 'audio/webm';
+    const extension = mime.includes('wav') ? 'wav'
+        : mime.includes('ogg') ? 'ogg'
+        : mime.includes('mp4') ? 'm4a'
+        : 'webm';
     const formData = new FormData();
-    formData.append("file", audioBlob, "recording.wav");
+    formData.append("file", audioBlob, `recording.${extension}`);
 
     try {
         const response = await fetch('/api/transcribe', {
@@ -976,17 +1144,20 @@ async function sendAudioToTranscribe(audioBlob) {
             // Si la transcripción está vacía (ruido), reactivar escucha si el modo está activo
             if (state.isVoiceModeActive) {
                 console.log("Transcripción vacía, reactivando escucha...");
-                startVoiceCapture();
+                restartVoiceIfIdle();
             }
         }
 
     } catch (error) {
         console.error("Error transcribiendo:", error);
-        elements.messageInput.value = "Error al escuchar.";
-        
+        elements.messageInput.value = '';
+        if (elements.charCount) {
+            elements.charCount.textContent = '0';
+        }
+
         // Intentar reactivar en caso de error
         if (state.isVoiceModeActive) {
-            setTimeout(startVoiceCapture, 2000);
+            setTimeout(restartVoiceIfIdle, 2000);
         }
     } finally {
         elements.messageInput.placeholder = `Escribe tu mensaje aquí, ${state.userName || "Mijin"}...`;
@@ -1493,7 +1664,7 @@ async function speakText(text, emotion = "neutral") {
         if (!response.ok) throw new Error('Error en TTS');
         const data = await response.json();
         if (data.audio_url) {
-            playAudio(data.audio_url);
+            playAudio(data.audio_url, false);
         }
     } catch (e) {
         console.error('Error en speakText:', e);

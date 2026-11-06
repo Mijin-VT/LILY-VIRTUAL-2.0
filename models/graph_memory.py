@@ -24,7 +24,7 @@ class GraphMemorySystem:
         self.client: Optional[Any] = None
         self.graph: Optional[Any] = None
         self.is_connected = False
-
+        
         self._init_connection()
 
     def _init_connection(self):
@@ -66,7 +66,7 @@ class GraphMemorySystem:
                 return True
             except Exception:
                 self.is_connected = False
-
+        
         # Intentar reconectar
         try:
             self._init_connection()
@@ -133,16 +133,16 @@ class GraphMemorySystem:
             LIMIT 15
             """
             result = self.graph.query(query_user_facts, {"user_name": user_name})
-
+            
             for row in result.result_set:
                 rel = row[0]
                 target = row[1]
                 target_str = str(target)
-
+                
                 # Si el target aparece en el mensaje o si es una consulta sobre preferencias/vida
                 is_relevant = any(w in clean_text for w in [target_str.lower(), rel.lower(), "cómo", "como", "quién", "quien", "cuál", "cual", "recuerdas", "sabes", "tengo", "mi", "mis"])
                 fact_str = f"{user_name} -> {rel.replace('_', ' ')} -> {target}"
-
+                
                 if is_relevant:
                     facts.append(fact_str)
         except Exception as e:
@@ -184,7 +184,7 @@ class GraphMemorySystem:
             # Mascotas: "mi perro se llama Toby", "tengo un gato llamado Michi", "mi mascota es un loro llamado Pepe"
             (r'\bmi\s+(perro|gata|gato|mascota|loro|conejo|hamster)\s+(?:se llama|es)\s+([A-Za-z0-9áéíóúñÁÉÍÓÚÑ]+)',
              lambda m: (user_name, f"TIENE_{m.group(1).upper()}", m.group(2).capitalize(), "User", "Mascota")),
-
+            
             (r'\btengo\s+(?:un|una)\s+(perro|gata|gato|mascota)\s+(?:llamado|llamada)\s+([A-Za-z0-9áéíóúñÁÉÍÓÚÑ]+)',
              lambda m: (user_name, f"TIENE_{m.group(1).upper()}", m.group(2).capitalize(), "User", "Mascota")),
 
@@ -231,7 +231,7 @@ class GraphMemorySystem:
         """Retorna estadísticas sobre el número de nodos y aristas en el grafo."""
         if not self.check_connection():
             return {"status": "offline", "nodes": 0, "relationships": 0}
-
+        
         try:
             nodes_res = self.graph.query("MATCH (n) RETURN count(n) AS cnt")
             rel_res = self.graph.query("MATCH ()-[r]->() RETURN count(r) AS cnt")

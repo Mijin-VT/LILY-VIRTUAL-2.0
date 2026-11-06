@@ -56,10 +56,11 @@ tmp/
 temp/
 *.tmp
 
-
-
 # Sesiones SSE (datos de usuario)
 data/sessions/
 
-# Sesiones SSE (datos de usuario)
-data/sessions/
+# Binarios pesados no soportados en Git (excede 100MB / limite de GitHub)
+tools/audiocpp/ggml-cuda.dll
+
+
+

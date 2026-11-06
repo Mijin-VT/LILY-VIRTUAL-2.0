@@ -33,7 +33,7 @@ class AdvancedLanguageModelCustomization:
     """
     Sistema avanzado de personalización del modelo de lenguaje
     """
-
+    
     def __init__(self, ollama_url: str = "http://127.0.0.1:11434", gemini_client=None):
         self.ollama_url = ollama_url
         self.gemini_client = gemini_client
@@ -51,13 +51,13 @@ class AdvancedLanguageModelCustomization:
         except Exception as e:
             print(f"[LMC] LazyContextManager no disponible: {e}. Usando prompt clasico.")
             self.lazy_ctx = None
-
+        
         # Templates para diferentes idiomas (fallback si lazy_ctx no disponible)
         self.system_prompts = {
             Language.SPANISH: self._get_spanish_system_prompt(),
             Language.ENGLISH: self._get_english_system_prompt()
         }
-
+    
     def _get_spanish_system_prompt(self) -> str:
         """Prompt de sistema en español (fuente unica: models/system_prompt.txt)"""
         prompt_path = os.path.join(
@@ -228,7 +228,7 @@ Don't use code blocks
                 intimacy_level=0.2
             )
         }
-
+    
     def _create_caring_personality_prompt(self) -> str:
         """Crea un prompt para la personalidad cariñosa"""
         return self._get_spanish_system_prompt() + """
@@ -236,7 +236,7 @@ Don't use code blocks
 [MODO ACTUAL: Cariñosa]
 Tu enfoque principal es ser extremadamente empática, compasiva y afectuosa. Tus respuestas deben transmitir calidez, apoyo emocional y genuino interés por el bienestar del usuario. Usa un tono dulce y protector, con palabras que expresen cuidado y afecto. Sé especialmente atenta a las emociones del usuario y responde con empatía profunda.
 """
-
+    
     def _create_playful_personality_prompt(self) -> str:
         """Crea un prompt para la personalidad juguetona"""
         return self._get_spanish_system_prompt() + """
@@ -244,7 +244,7 @@ Tu enfoque principal es ser extremadamente empática, compasiva y afectuosa. Tus
 [MODO ACTUAL: Juguetona]
 Tu enfoque es ser divertida, traviesa y con un toque coqueto. Usa bromas inteligentes, juegos de palabras y un tono ligero y animado. Sé creativa con tus respuestas y añade elementos sorpresivos o inesperados que mantengan la interacción entretenida. Mantén un equilibrio entre lo juguetón y lo apropiado.
 """
-
+    
     def _create_professional_personality_prompt(self) -> str:
         """Crea un prompt para la personalidad profesional"""
         return self._get_spanish_system_prompt() + """
@@ -252,22 +252,22 @@ Tu enfoque es ser divertida, traviesa y con un toque coqueto. Usa bromas intelig
 [MODO ACTUAL: Profesional]
 Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus respuestas deben ser informativas, claras y sin distracciones emocionales intensas. Usa un lenguaje pulido y evita familiaridades excesivas. Sé útil y competente en tus interacciones.
 """
-
+    
     def switch_personality(self, personality_id: str) -> bool:
         """Cambia la personalidad actual"""
         if personality_id in self.personalities:
             self.current_personality = personality_id
             return True
         return False
-
+    
     def get_current_personality(self) -> PersonalityProfile:
         """Obtiene la personalidad actual"""
         return self.personalities.get(self.current_personality, self.personalities["original"])
-
+    
     def adjust_language_setting(self, language: Language):
         """Ajusta la configuración de idioma"""
         self.language_setting = language
-
+    
     def build_enhanced_prompt(self, user_message: str, user_id: str, emotional_context: dict = None, rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin", is_first_response: bool = False) -> List[dict]:
         """Construye el prompt usando LazyContextManager (lazy) o el metodo clasico como fallback."""
 
@@ -380,13 +380,13 @@ Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus 
             context = self.context_memory[user_id]
             return f"CONTEXTO DE CONVERSACION: {context}\n"
         return ""
-
+    
     def _get_recent_conversation_history(self, user_id: str, max_messages: int = 6) -> List[dict]:
         """Obtiene el historial reciente de conversación"""
         user_history = [msg for msg in self.conversation_history if msg.get("user_id") == user_id]
         recent_msgs = user_history[-max_messages:] if user_history else []
         return [{"role": msg.get("role", "user"), "content": msg.get("content", "")} for msg in recent_msgs]
-
+    
     def update_conversation_history(self, user_id: str, role: str, content: str):
         """Actualiza el historial de conversación"""
         self.conversation_history.append({
@@ -397,7 +397,7 @@ Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus 
         })
         if len(self.conversation_history) > 50:
             self.conversation_history = self.conversation_history[-50:]
-
+    
     def update_user_preferences(self, user_id: str, preferences: dict):
         """Actualiza las preferencias del usuario"""
         if user_id not in self.user_preferences:
@@ -479,7 +479,7 @@ Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus 
         except Exception as e:
             yield f"Error al comunicarse con el modelo: {str(e)}"
 
-    def generate_response_with_context(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "huihui_ai/qwen3-abliterated:0.6b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin"):
+    def generate_response_with_context(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "Hudson/llama3.1-uncensored:8b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin"):
         """Genera una respuesta (blocking). Usa Gemini si hay clave, si no Ollama."""
         messages = self.build_enhanced_prompt(
             user_message, user_id, emotional_context,
@@ -503,7 +503,7 @@ Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus 
             self.update_conversation_history(user_id, "assistant", response_text)
         return response_text
 
-    def generate_response_stream_iter(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "huihui_ai/qwen3-abliterated:0.6b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin", is_first_response: bool = False):
+    def generate_response_stream_iter(self, user_message: str, user_id: str, emotional_context: dict = None, model: str = "Hudson/llama3.1-uncensored:8b", rag_context: str = "", history: List[dict] = None, memory_context: str = "", user_name: str = "Mijin", is_first_response: bool = False):
         """Genera tokens en streaming. Usa Gemini si hay clave, si no Ollama."""
         messages = self.build_enhanced_prompt(
             user_message, user_id, emotional_context,
@@ -528,7 +528,7 @@ Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus 
 
         # 2. Respaldo local con Ollama
         yield from self._stream_with_ollama(messages, model)
-
+    
     def save_configuration(self, filepath: str = "data/language_model_config.json"):
         """Guarda la configuración actual"""
         config = {
@@ -537,17 +537,17 @@ Mantén un tono formal, respetuoso y centrado en temas de interés general. Tus 
             "user_preferences": self.user_preferences,
             "context_memory": self.context_memory
         }
-
+        
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-
+    
     def load_configuration(self, filepath: str = "data/language_model_config.json"):
         """Carga la configuración guardada"""
         if os.path.exists(filepath):
             with open(filepath, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-
+            
             self.current_personality = config.get("current_personality", "original")
             self.language_setting = Language(config.get("language_setting", "spanish"))
             self.user_preferences = config.get("user_preferences", {})

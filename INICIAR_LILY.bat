@@ -94,31 +94,31 @@ if errorlevel 1 (
 )
 echo.
 
-REM [4/4] Verificar Ollama y el Modelo huihui_ai/qwen3-abliterated:0.6b
+REM [4/4] Verificar Ollama y el Modelo Hudson/llama3.1-uncensored:8b
 echo [4/4] Verificando Ollama...
 curl -s http://127.0.0.1:11434/api/tags >nul 2>&1
 if errorlevel 1 (
     echo [ADVERTENCIA] Ollama no esta ejecutandose
     echo La aplicacion funcionara pero sin IA conversacional.
     echo 1. Instala Ollama desde https://ollama.ai/
-    echo 2. Ejecuta: ollama pull huihui_ai/qwen3-abliterated:0.6b
+    echo 2. Ejecuta: ollama pull Hudson/llama3.1-uncensored:8b
     echo.
 ) else (
     echo [OK] Ollama detectado y en linea
-    echo Verificando si el modelo 'huihui_ai/qwen3-abliterated:0.6b' esta instalado...
-    ollama show huihui_ai/qwen3-abliterated:0.6b >nul 2>&1
+    echo Verificando si el modelo 'Hudson/llama3.1-uncensored:8b' esta instalado...
+    ollama show Hudson/llama3.1-uncensored:8b >nul 2>&1
     if errorlevel 1 (
-        echo [ADVERTENCIA] El modelo 'huihui_ai/qwen3-abliterated:0.6b' no se encuentra en Ollama.
-        echo Descargando 'huihui_ai/qwen3-abliterated:0.6b' - esto puede tardar varios minutos...
-        ollama pull huihui_ai/qwen3-abliterated:0.6b
+        echo [ADVERTENCIA] El modelo 'Hudson/llama3.1-uncensored:8b' no se encuentra en Ollama.
+        echo Descargando 'Hudson/llama3.1-uncensored:8b' - esto puede tardar varios minutos...
+        ollama pull Hudson/llama3.1-uncensored:8b
         if errorlevel 1 (
-            echo [ERROR] No se pudo descargar el modelo 'huihui_ai/qwen3-abliterated:0.6b' automaticamente.
-            echo Por favor, ejecuta en otra consola: ollama pull huihui_ai/qwen3-abliterated:0.6b
+            echo [ERROR] No se pudo descargar el modelo 'Hudson/llama3.1-uncensored:8b' automaticamente.
+            echo Por favor, ejecuta en otra consola: ollama pull Hudson/llama3.1-uncensored:8b
         ) else (
-            echo [OK] Modelo 'huihui_ai/qwen3-abliterated:0.6b' descargado e instalado con exito
+            echo [OK] Modelo 'Hudson/llama3.1-uncensored:8b' descargado e instalado con exito
         )
     ) else (
-        echo [OK] Modelo 'huihui_ai/qwen3-abliterated:0.6b' ya esta instalado en Ollama
+        echo [OK] Modelo 'Hudson/llama3.1-uncensored:8b' ya esta instalado en Ollama
     )
 )
 echo.
@@ -138,11 +138,24 @@ ping 127.0.0.1 -n 4 >nul 2>&1
 
 start msedge http://127.0.0.1:8000
 
-"%PYTHON_PATH%" main.py
+"%PYTHON_PATH%" main.py > lily_crash.log 2>&1
+set PYTHON_EXIT=%ERRORLEVEL%
 
-echo.
-echo ========================================
-echo Servidor detenido
-echo ========================================
+if %PYTHON_EXIT% NEQ 0 (
+    echo.
+    echo ========================================
+    echo [ERROR] El servidor termino con codigo: %PYTHON_EXIT%
+    echo ========================================
+    echo.
+    echo === ULTIMAS LINEAS DEL ERROR ===
+    powershell -Command "Get-Content lily_crash.log -Tail 30"
+    echo.
+    echo El log completo esta en: %CD%\lily_crash.log
+) else (
+    echo.
+    echo ========================================
+    echo Servidor detenido correctamente
+    echo ========================================
+)
 echo.
 pause

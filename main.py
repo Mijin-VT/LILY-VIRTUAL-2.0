@@ -17,7 +17,7 @@ from datetime import datetime
 
 # Sistema de Logs
 logging.basicConfig(
-    filename='lily_errors.log',
+    filename='lily_errors.log', 
     level=logging.ERROR,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
@@ -92,7 +92,7 @@ async def health_check():
         gemini_status = ai_engine.gemini_client.has_any_configured_key()
     except Exception:
         gemini_status = False
-
+    
     return {
         "status": "healthy" if (ollama_status or gemini_status) else "degraded",
         "ollama_connected": ollama_status,
@@ -107,17 +107,17 @@ async def chat(request: ChatRequest):
     try:
         # Generar respuesta
         response_text, emotion = ai_engine.generate_response(
-            request.message,
+            request.message, 
             request.user_id
         )
-
+        
         # Generar audio con TTS
         audio_url = None
         try:
             audio_url = tts_engine.text_to_speech(response_text, emotion.value)
         except Exception as e:
             print(f"Error generando audio: {e}")
-
+        
         # Preparar respuesta
         return ChatResponse(
             response=response_text,
@@ -125,7 +125,7 @@ async def chat(request: ChatRequest):
             audio_url=audio_url,
             timestamp=datetime.now().isoformat()
         )
-
+        
     except Exception as e:
         logging.error(f"Error en /api/chat: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error generando respuesta: {str(e)}")
@@ -144,15 +144,7 @@ async def chat_stream(request: ChatRequest):
     async def event_generator():
         loop = asyncio.get_event_loop()
         try:
-            # Ejecutar el generador sincrono en un executor para no bloquear el event loop
-            def run_stream():
-                events = []
-                for evt in ai_engine.generate_response_stream(request.message, request.user_id):
-                    events.append(evt)
-                return events
-
-            # Stream progresivo: usar run_in_executor con queue para emitir tokens en tiempo real
-            import concurrent.futures
+            # Stream progresivo: usar un hilo productor y una cola para emitir tokens en tiempo real
             import queue as _queue
 
             q = _queue.Queue()
@@ -222,7 +214,7 @@ async def session_replay(user_id: str, since: float = 0.0):
 async def get_current_emotion():
     """Obtener la emoción actual de Lily"""
     emotional_state = ai_engine.get_emotional_state()
-
+    
     return {
         "emotion": emotional_state.emotion.value,
         "intensity": emotional_state.intensity,
@@ -238,7 +230,7 @@ async def get_user_memory(user_id: str):
         context = ai_engine.memory_system.get_conversation_context(user_id, max_messages=10)
         summary = ai_engine.memory_system.get_conversation_summary(user_id)
         emotional_summary = ai_engine.memory_system.get_emotional_summary(user_id)
-
+        
         return {
             "user_id": user_id,
             "conversation_summary": summary,
@@ -263,7 +255,7 @@ async def get_preferences(user_id: str):
                 gemini_key_preview = f"{gemini_api_key[:6]}...{gemini_api_key[-4:]}"
             else:
                 gemini_key_preview = "****"
-
+        
         return {
             "gmail_user": gmail_user,
             "has_password": has_password,
@@ -328,7 +320,7 @@ async def text_to_speech(request: Request):
     data = await request.json()
     text = data.get("text", "")
     emotion = data.get("emotion", "neutral")
-
+    
     try:
         audio_url = tts_engine.text_to_speech(text, emotion)
         return {
@@ -344,14 +336,19 @@ async def text_to_speech(request: Request):
 @app.post("/api/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
     """Endpoint para transcribir audio (Speech-to-Text) usando Faster Whisper"""
-    temp_filename = f"temp_audio_{datetime.now().timestamp()}.wav"
+    extension = os.path.splitext(file.filename or "")[1].lower()
+    if extension not in {".wav", ".webm", ".ogg", ".mp3", ".m4a", ".flac"}:
+        extension = ".wav"
+    temp_filename = f"temp_audio_{datetime.now().timestamp()}{extension}"
     try:
         # Guardar archivo temporalmente
         with open(temp_filename, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-
+            
         # Transcribir
         text = stt_engine.transcribe(temp_filename)
+        if text and text.startswith("Error"):
+            raise HTTPException(status_code=500, detail=text)
 
         return {"text": text, "engine": "whisper"}
     except Exception as e:
@@ -370,7 +367,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
 async def get_audio(filename: str):
     """Servir archivos de audio generados"""
     audio_path = os.path.join("static", "audio", filename)
-
+    
     if os.path.exists(audio_path):
         media_type = "audio/mpeg" if filename.endswith(".mp3") else "audio/wav"
         return FileResponse(audio_path, media_type=media_type)
@@ -513,9 +510,9 @@ async def upload_document(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
-
+        
         doc_ids = rag_engine.ingest_file(file_path, metadata={"uploaded_by": "web_interface"})
-
+        
         if doc_ids:
             return {
                 "success": True,
@@ -578,12 +575,12 @@ def query_knowledge(request: dict):
     try:
         query_text = request.get("query", "")
         n_results = request.get("n_results", 3)
-
+        
         if not query_text:
             raise HTTPException(status_code=400, detail="Query es requerido")
-
+        
         documents, metadatas = rag_engine.query(query_text, n_results=n_results)
-
+        
         return {
             "success": True,
             "results": [{"text": doc, "metadata": meta} for doc, meta in zip(documents, metadatas)],
@@ -602,7 +599,7 @@ def configure_rag(config: dict):
         if "chunk_size" in config:
             overlap = config.get("chunk_overlap", 50)
             rag_engine.set_chunk_size(config["chunk_size"], overlap=overlap)
-
+        
         return {
             "success": True,
             "message": "RAG configurado correctamente",
@@ -623,11 +620,11 @@ if __name__ == "__main__":
     print(f"Servidor iniciando en: http://127.0.0.1:8000")
     print(f"Documentación API: http://127.0.0.1:8000/docs")
     print("=" * 60)
-
+    
     # Limpiar archivos de audio antiguos al iniciar
     print("Limpiando archivos de audio antiguos...")
     tts_engine.clean_old_audio_files(max_age_seconds=300)
-
+    
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
